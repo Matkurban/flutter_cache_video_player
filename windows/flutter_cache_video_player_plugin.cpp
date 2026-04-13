@@ -303,10 +303,21 @@ int64_t NativeVideoPlayer::Create() {
 
 void NativeVideoPlayer::Open(const std::string& url) {
   if (!media_engine_) return;
+
+  // 切换源时清理旧状态 / Clean up previous media state on source switch
+  StopFrameTimer();
+  frame_count_ = 0;
+  video_w_ = 0;
+  video_h_ = 0;
+
   BSTR bstr = SysAllocString(Utf8ToWide(url).c_str());
   media_engine_->SetSource(bstr);
   SysFreeString(bstr);
   media_engine_->Load();
+  // Load 后立即调用 Play()，媒体引擎会在准备就绪后自动开始播放。
+  // Call Play() right after Load(). The media engine will auto-play once ready.
+  media_engine_->Play();
+  SendEvent("playing", flutter::EncodableValue(true));
   SendEvent("buffering", flutter::EncodableValue(true));
 }
 

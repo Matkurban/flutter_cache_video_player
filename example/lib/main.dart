@@ -35,21 +35,19 @@ class _ExampleAppState extends State<ExampleApp> with SignalsMixin {
       await _app.init();
       _app.playlistManager.setPlaylist([
         const PlaylistItem(
-          url:
-              'https://videos.pexels.com/video-files/33538187/14261042_1080_1920_60fps.mp4',
+          url: 'https://videos.pexels.com/video-files/33538187/14261042_1080_1920_60fps.mp4',
           title: 'Test Video 1',
         ),
         const PlaylistItem(
-          url:
-              'https://videos.pexels.com/video-files/29603233/12740435_3840_2160_30fps.mp4',
+          url: 'https://videos.pexels.com/video-files/29603233/12740435_3840_2160_30fps.mp4',
           title: 'Test Video 2',
         ),
         const PlaylistItem(
-          url:
-              'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
+          url: 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
           title: 'Butterfly',
         ),
       ]);
+      await _app.playlistManager.playIndex(0);
       _ready.value = true;
     } catch (e) {
       _error.value = e.toString();
@@ -264,12 +262,7 @@ class _PlayerAreaState extends State<_PlayerArea> with SignalsMixin {
     );
   }
 
-  Widget _buildSurface(
-    BuildContext context,
-    PlayState ps,
-    String? err,
-    bool buffering,
-  ) {
+  Widget _buildSurface(BuildContext context, PlayState ps, String? err, bool buffering) {
     // Error
     if (ps == PlayState.error) {
       return Container(
@@ -278,11 +271,7 @@ class _PlayerAreaState extends State<_PlayerArea> with SignalsMixin {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.redAccent,
-                size: 48,
-              ),
+              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -402,15 +391,10 @@ class _ControlsBar extends StatelessWidget {
                   Expanded(
                     child: Slider(
                       value: dur.inMilliseconds > 0
-                          ? pos.inMilliseconds
-                                .clamp(0, dur.inMilliseconds)
-                                .toDouble()
+                          ? pos.inMilliseconds.clamp(0, dur.inMilliseconds).toDouble()
                           : 0,
-                      max: dur.inMilliseconds > 0
-                          ? dur.inMilliseconds.toDouble()
-                          : 1,
-                      onChanged: (v) =>
-                          _svc.seek(Duration(milliseconds: v.toInt())),
+                      max: dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1,
+                      onChanged: (v) => _svc.seek(Duration(milliseconds: v.toInt())),
                     ),
                   ),
                   Text(_fmt(dur), style: _ts(context)),
@@ -543,10 +527,7 @@ class _PlaylistSectionState extends State<_PlaylistSection> with SignalsMixin {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: active
-                      ? TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        )
+                      ? TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)
                       : null,
                 ),
                 onTap: () => _mgr.playIndex(index),
@@ -562,20 +543,14 @@ class _PlaylistSectionState extends State<_PlaylistSection> with SignalsMixin {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: Icon(
-                  Icons.shuffle,
-                  color: shuffleOn ? theme.colorScheme.primary : null,
-                ),
+                icon: Icon(Icons.shuffle, color: shuffleOn ? theme.colorScheme.primary : null),
                 onPressed: () {
                   _mgr.toggleShuffle();
                   _shuffle.value = _mgr.shuffle;
                 },
               ),
               IconButton(
-                icon: Icon(
-                  Icons.repeat,
-                  color: repeatOn ? theme.colorScheme.primary : null,
-                ),
+                icon: Icon(Icons.repeat, color: repeatOn ? theme.colorScheme.primary : null),
                 onPressed: () {
                   _mgr.toggleRepeat();
                   _repeat.value = _mgr.repeat;

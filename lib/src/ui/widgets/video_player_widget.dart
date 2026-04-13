@@ -132,12 +132,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SignalsMixin
         );
       }
       final textureId = _svc.textureId;
+      // loading = 切换新视频，不显示旧画面；buffering = 当前视频缓冲中，保留画面。
+      // loading = switching to a new video, hide stale frame; buffering = stall on current video, keep frame.
+      final showTexture = buffering && ps != PlayState.loading;
       return Container(
         color: Colors.black,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (textureId != null)
+            if (showTexture && textureId != null)
               AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Texture(textureId: textureId),

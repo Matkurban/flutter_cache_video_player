@@ -69,7 +69,7 @@
 
 ```yaml
 dependencies:
-  flutter_cache_video_player: ^0.1.0
+  flutter_cache_video_player: ^lasted
 ```
 
 ### 平台配置

@@ -311,12 +311,14 @@ class _PlayerAreaState extends State<_PlayerArea> with SignalsMixin {
 
     // Loading / buffering
     if (ps == PlayState.loading || buffering) {
+      // loading = 切换新视频；buffering = 当前视频缓冲
+      final showTexture = buffering && ps != PlayState.loading;
       return Container(
         color: Colors.black,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (!kIsWeb && _svc.textureId != null)
+            if (showTexture && !kIsWeb && _svc.textureId != null)
               AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Texture(textureId: _svc.textureId!),

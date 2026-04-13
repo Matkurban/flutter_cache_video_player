@@ -68,12 +68,12 @@ class ProxyCacheServer {
     final urlHash = UrlHasher.hash(originalUrl);
     var mediaIndex = await cacheRepo.findByHash(urlHash);
 
-    // First time: HEAD request to get metadata
+    // initCache() 应已预初始化——如果仍找不到则立即返回错误，不阻塞等待远程 HTTP。
+    // initCache() should have pre-initialized. If missing, return error
+    // immediately instead of blocking on a remote HTTP request.
     if (mediaIndex == null) {
-      mediaIndex = await _initMedia(originalUrl, urlHash);
-      if (mediaIndex == null) {
-        return Response.internalServerError(body: 'Failed to initialize media');
-      }
+      Logger.error('MediaIndex not found for $originalUrl (initCache may have failed)');
+      return Response(503, body: 'Media not yet initialized');
     }
 
     await cacheRepo.updateLastAccessed(urlHash);
@@ -163,8 +163,22 @@ class ProxyCacheServer {
         final readEnd = (i == endChunk) ? rangeEnd - chunkByteStart : config.chunkSize - 1;
 
         if (bitmap.isChunkCompleted(i)) {
-          // Read from local file
-          await _readLocalChunk(controller, chunkPath, mergedPath, i, readStart, readEnd);
+          // 尝试从本地文件读取。如果文件不存在（DB 与磁盘不一致），
+          // 降级为下载路径而非直接崩溃。
+          // Try reading from local file. If missing (DB/disk inconsistency),
+          // fall through to the download path instead of crashing.
+          final chunkExists = await File(chunkPath).exists();
+          final mergedExists = !chunkExists && await File(mergedPath).exists();
+          if (chunkExists || mergedExists) {
+            await _readLocalChunk(controller, chunkPath, mergedPath, i, readStart, readEnd);
+          } else {
+            Logger.warning('Chunk $i marked complete but file missing, re-downloading');
+            // 位图标记完成但文件不存在——需要先使位图失效，否则 Worker 会跳过下载。
+            // Bitmap says complete but file is gone — invalidate bitmap first,
+            // otherwise the download manager will skip this chunk.
+            await downloadManager.invalidateAndDownloadChunk(i);
+            await _downloadAndStream(controller, media, i, readStart, readEnd);
+          }
         } else {
           // Request download and wait
           await _downloadAndStream(controller, media, i, readStart, readEnd);
@@ -248,7 +262,7 @@ class ProxyCacheServer {
     }
 
     try {
-      await dataCompleter.future.timeout(const Duration(seconds: 30));
+      await dataCompleter.future.timeout(const Duration(seconds: 15));
 
       // 下载完成后，直接从磁盘读取精确字节范围（支持合并文件回退）。
       // After download completes, read the exact byte range from disk (with merged file fallback).
@@ -411,14 +425,36 @@ class ProxyCacheServer {
   }
 
   /// 仅初始化缓存（创建索引并启动后台下载），不提供流服务。
-  /// Initializes caching only (creates index and starts background download) without serving a stream.
+  /// 失败时抛出异常以便调用方落回原始 URL。
+  /// Initializes caching only (creates index and starts background download)
+  /// without serving a stream. Throws on failure so caller can fall back.
   Future<void> initCache(String originalUrl) async {
     final urlHash = UrlHasher.hash(originalUrl);
     var mediaIndex = await cacheRepo.findByHash(urlHash);
+    if (mediaIndex != null) {
+      // iOS 调试/重装后容器 UUID 会变，DB 中存的旧绝对路径不再可用。
+      // 检测路径是否有效，无效则删除旧记录从头初始化。
+      // On iOS the container UUID changes between debug sessions / reinstalls.
+      // Detect stale absolute paths and purge the old record so we start fresh.
+      final dir = Directory(mediaIndex.localDir);
+      if (!await dir.exists()) {
+        Logger.warning('Stale localDir detected (${mediaIndex.localDir}), purging record');
+        await cacheRepo.deleteMedia(urlHash);
+        mediaIndex = null; // fall through to _initMedia below
+      }
+    }
+
     if (mediaIndex == null) {
-      await _initMedia(originalUrl, urlHash);
+      final result = await _initMedia(originalUrl, urlHash);
+      if (result == null) {
+        throw Exception('Failed to fetch media metadata for $originalUrl');
+      }
     } else {
       await cacheRepo.updateLastAccessed(urlHash);
+      // 确保后台下载在运行——可能是上次会话残留的记录，Worker 并未启动。
+      // Ensure background download is running — this entry may be left over
+      // from a previous session where workers were not started.
+      await downloadManager.startDownload(originalUrl, mediaIndex);
     }
   }
 

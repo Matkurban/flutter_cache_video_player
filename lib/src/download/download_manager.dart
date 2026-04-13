@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:typed_data';
 import '../core/constants.dart';
 import '../core/logger.dart';
 import '../core/platform_detector.dart';
@@ -71,7 +72,16 @@ class DownloadManager {
       case WorkerReady():
         _dispatchNext();
         break;
-      case WorkerCancelled():
+      case WorkerCancelled(:final chunkIndex):
+        // 向 failureStream 发送事件，以解除 _downloadAndStream 中等待的 Completer。
+        // Emit failure so that _downloadAndStream completers are unblocked.
+        _failureController.add(
+          ChunkFailed(
+            chunkIndex: chunkIndex,
+            errorMessage: 'Download cancelled (media switched)',
+            retryable: false,
+          ),
+        );
         _dispatchNext();
         break;
     }
@@ -138,6 +148,10 @@ class DownloadManager {
   Future<void> startDownload(String url, MediaIndex media) async {
     if (PlatformDetector.isWeb) return;
 
+    // 切换媒体时立即取消旧任务，释放 Worker 供新媒体使用。
+    // Cancel existing downloads immediately to free workers for the new media.
+    _pool.cancelAll();
+
     _currentUrlHash = media.urlHash;
     _currentMedia = media;
     _currentBitmap = await cacheRepo.getBitmap(media.urlHash);
@@ -198,6 +212,38 @@ class DownloadManager {
     if (_pool.activeChunkIndices.contains(chunkIndex)) return;
 
     // Add as P0
+    final task = _createTask(chunkIndex, TaskPriority.p0Urgent);
+    if (task != null) {
+      _taskQueue.add(task);
+      _dispatchNext();
+    }
+  }
+
+  /// 强制使指定分片的缓存失效并重新下载。
+  /// 用于处理 DB 位图与磁盘文件不一致的情况（如 chunk 文件被删但位图仍标记完成）。
+  /// Invalidates a chunk whose bitmap says "complete" but whose file is missing,
+  /// resets the bitmap bit, and queues an urgent re-download.
+  Future<void> invalidateAndDownloadChunk(int chunkIndex) async {
+    if (_currentMedia == null || _currentBitmap == null) return;
+
+    // 重置该分片在位图中的完成标记。
+    // Clear the completion bit for this chunk.
+    final newBitmap = Uint8List.fromList(_currentBitmap!.bitmap);
+    final byteIndex = chunkIndex ~/ 8;
+    final bitIndex = chunkIndex % 8;
+    if (byteIndex < newBitmap.length) {
+      newBitmap[byteIndex] &= ~(1 << bitIndex);
+    }
+    _currentBitmap = ChunkBitmap(
+      urlHash: _currentBitmap!.urlHash,
+      bitmap: newBitmap,
+      downloadedBytes: _currentBitmap!.downloadedBytes,
+    );
+    await cacheRepo.updateBitmap(_currentBitmap!);
+    Logger.info('Invalidated chunk $chunkIndex bitmap, queuing re-download');
+
+    // 跳过 activeChunkIndices 检查——该分片可能不在下载中。
+    // Skip activeChunkIndices check — this chunk is almost certainly not active.
     final task = _createTask(chunkIndex, TaskPriority.p0Urgent);
     if (task != null) {
       _taskQueue.add(task);

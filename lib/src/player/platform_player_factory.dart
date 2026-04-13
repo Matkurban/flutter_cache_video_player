@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/logger.dart';
 import '../proxy/proxy_server.dart';
 
 /// 平台播放工厂，根据平台返回代理 URL 或原始 URL。
@@ -23,10 +24,17 @@ class PlatformPlayerFactory {
 
     // 预初始化：在返回代理 URL 前先从源服务器获取元数据（大小、MIME 类型）。
     // 这样当原生播放器连接代理时，MediaIndex 已就绪，代理可立即响应。
+    // 如果初始化失败（网络异常等），退化为直接使用原始 URL 播放。
     // Pre-initialize: fetch metadata (size, MIME type) from origin server before
     // returning the proxy URL. When the native player connects, existing
     // MediaIndex lets the proxy respond immediately instead of blocking.
-    await proxyServer!.initCache(originalUrl);
+    // On failure (network error etc.), fall back to the original URL.
+    try {
+      await proxyServer!.initCache(originalUrl);
+    } catch (e) {
+      Logger.warning('initCache failed, falling back to direct URL: $e');
+      return originalUrl;
+    }
 
     return proxyServer!.proxyUrl(originalUrl);
   }

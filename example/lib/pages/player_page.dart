@@ -48,19 +48,7 @@ class PlayerPage extends StatelessWidget {
         }
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Cache Video Player'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.settings),
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => SettingsSheet(themeController: app.themeController),
-                ),
-              ),
-            ],
-          ),
+          appBar: AppBar(title: const Text('Cache Video Player')),
           body: body,
         );
       },

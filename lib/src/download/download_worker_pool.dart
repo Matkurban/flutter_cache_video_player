@@ -78,8 +78,23 @@ class DownloadWorkerPool {
   void _handleWorkerEvent(int workerIndex, WorkerEvent event) {
     if (workerIndex < _workers.length) {
       if (event is ChunkCompleted || event is ChunkFailed || event is WorkerCancelled) {
-        _workers[workerIndex].isBusy = false;
-        _workers[workerIndex].currentChunkIndex = null;
+        final handle = _workers[workerIndex];
+        // 仅在事件 chunkIndex 与当前任务匹配时重置状态。
+        // cancelAll() 已立即重置过——忽略后续到达的过期事件，
+        // 避免误释放正在执行新任务的 Worker。
+        // Only reset state when the event's chunkIndex matches the current task.
+        // cancelAll() already reset state eagerly — stale events arriving later
+        // must not accidentally free a worker that is now handling a new task.
+        final eventChunk = switch (event) {
+          ChunkCompleted e => e.chunkIndex,
+          ChunkFailed e => e.chunkIndex,
+          WorkerCancelled e => e.chunkIndex,
+          _ => null,
+        };
+        if (handle.currentChunkIndex == eventChunk) {
+          handle.isBusy = false;
+          handle.currentChunkIndex = null;
+        }
       }
     }
     _eventController.add(event);
@@ -128,12 +143,14 @@ class DownloadWorkerPool {
     }
   }
 
-  /// 取消所有正在进行的下载（不立即释放 Worker，等待 cancelled 事件）。
-  /// Cancels all in-progress downloads (workers released upon cancelled events).
+  /// 取消所有正在进行的下载并立即释放 Worker。
+  /// Cancels all in-progress downloads and immediately marks workers as available.
   void cancelAll() {
     for (final w in _workers) {
       if (w.isBusy) {
         w.sendPort.send({'command': 'cancel'});
+        w.isBusy = false;
+        w.currentChunkIndex = null;
       }
     }
   }

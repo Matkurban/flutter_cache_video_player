@@ -133,7 +133,7 @@ class PlayerService {
 
       state.setPlayState(PlayState.loading);
 
-      final mediaUrl = playerFactory.createMediaUrl(url);
+      final mediaUrl = await playerFactory.createMediaUrl(url);
       Logger.info('Opening media: $url → $mediaUrl');
 
       await _controller.open(mediaUrl);

@@ -339,6 +339,33 @@ class ProxyCacheServer {
     return 'MISS';
   }
 
+  /// 获取已缓存的合并文件 URL（file:/// 格式），未缓存时返回 null。
+  /// Returns the cached merged file URL (file:/// format), or null if not cached.
+  Future<String?> getCachedFileUrl(String originalUrl) async {
+    final urlHash = UrlHasher.hash(originalUrl);
+    final mediaIndex = await cacheRepo.findByHash(urlHash);
+    if (mediaIndex == null) return null;
+
+    final mergedFile = File('${mediaIndex.localDir}/${FileUtils.mergedFileName()}');
+    if (await mergedFile.exists()) {
+      await cacheRepo.updateLastAccessed(urlHash);
+      return Uri.file(mergedFile.path).toString();
+    }
+    return null;
+  }
+
+  /// 仅初始化缓存（创建索引并启动后台下载），不提供流服务。
+  /// Initializes caching only (creates index and starts background download) without serving a stream.
+  Future<void> initCache(String originalUrl) async {
+    final urlHash = UrlHasher.hash(originalUrl);
+    var mediaIndex = await cacheRepo.findByHash(urlHash);
+    if (mediaIndex == null) {
+      await _initMedia(originalUrl, urlHash);
+    } else {
+      await cacheRepo.updateLastAccessed(urlHash);
+    }
+  }
+
   /// 停止本地 HTTP 服务器。
   /// Stops the local HTTP server.
   Future<void> stop() async {

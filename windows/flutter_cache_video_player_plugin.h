@@ -89,12 +89,11 @@ class NativeVideoPlayer {
   /// Drains pending events on the platform thread (called from WndProc delegate).
   void DrainEvents();
 
- private:
-  bool InitD3D();
-  bool InitMediaEngine();
-  bool EnsureRenderTarget(UINT w, UINT h);
-  void OnMediaEvent(DWORD event, DWORD_PTR p1, DWORD p2);
+  /// 轮询媒体引擎状态并提取帧（由 WM_TIMER 在平台线程上触发）。
+  /// Polls media engine state and extracts frames (triggered by WM_TIMER on the platform thread).
   void PollAndRender();
+
+ private:
   void StartFrameTimer();
   void StopFrameTimer();
   void SendEvent(const std::string& name, const flutter::EncodableValue& val);

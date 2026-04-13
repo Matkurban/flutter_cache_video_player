@@ -60,7 +60,19 @@ class FlutterCacheVideoPlayerController {
       effect(() {
         final playing = _nativeController.playingSignal.value;
         if (playing) {
+          final wasFirstPlay = !_hasPlayedSinceOpen;
           _hasPlayedSinceOpen = true;
+          // 首次 playing=true 时，duration 等信号可能已被更新但被守卫丢弃，
+          // 且由于信号同值不触发的特性不会再次通知 effect。需要主动推送。
+          // On first playing=true, duration (etc.) may have already been
+          // set on the signal but discarded by the guard. Since same-value
+          // assignments don't re-trigger effects, push the value manually.
+          if (wasFirstPlay) {
+            final dur = _nativeController.durationSignal.value;
+            if (dur > Duration.zero) {
+              state.duration.value = dur;
+            }
+          }
         } else if (!_hasPlayedSinceOpen) {
           Logger.warning('Ignoring stale paused event before first playing(true)');
           return;

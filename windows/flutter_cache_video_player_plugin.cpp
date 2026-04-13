@@ -304,19 +304,6 @@ void NativeVideoPlayer::PollAndRender() {
     if (playing != last_playing_) {
       SendEvent("playing", flutter::EncodableValue(playing));
       last_playing_ = playing;
-      // Dart 端的 _hasPlayedSinceOpen 守卫在 playing=true 时才放行，
-      // 但 duration 事件通常在 playing 之前就已发送并被丢弃。
-      // 这里在首次 playing=true 时重发 duration，确保 Dart 能正确接收。
-      // Dart's _hasPlayedSinceOpen guard only passes after playing=true,
-      // but duration is usually sent (and discarded) before that.
-      // Re-send duration on first play so Dart receives it properly.
-      if (playing && duration_sent_) {
-        double dur = media_engine_->GetDuration();
-        if (!isinf(dur) && !isnan(dur) && dur > 0) {
-          SendEvent("duration",
-                    flutter::EncodableValue(static_cast<int>(dur * 1000)));
-        }
-      }
     }
   }
 

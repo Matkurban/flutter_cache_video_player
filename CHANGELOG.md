@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- fix windows bugs
+
 ## 1.0.0
 
 Initial release.

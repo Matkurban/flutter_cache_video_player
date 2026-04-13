@@ -304,6 +304,19 @@ void NativeVideoPlayer::PollAndRender() {
     if (playing != last_playing_) {
       SendEvent("playing", flutter::EncodableValue(playing));
       last_playing_ = playing;
+      // Dart 端的 _hasPlayedSinceOpen 守卫在 playing=true 时才放行，
+      // 但 duration 事件通常在 playing 之前就已发送并被丢弃。
+      // 这里在首次 playing=true 时重发 duration，确保 Dart 能正确接收。
+      // Dart's _hasPlayedSinceOpen guard only passes after playing=true,
+      // but duration is usually sent (and discarded) before that.
+      // Re-send duration on first play so Dart receives it properly.
+      if (playing && duration_sent_) {
+        double dur = media_engine_->GetDuration();
+        if (!isinf(dur) && !isnan(dur) && dur > 0) {
+          SendEvent("duration",
+                    flutter::EncodableValue(static_cast<int>(dur * 1000)));
+        }
+      }
     }
   }
 
@@ -359,10 +372,22 @@ void NativeVideoPlayer::PollAndRender() {
 
   {
     std::lock_guard<std::mutex> lock(buf_mutex_);
-    const uint8_t* src_data = static_cast<const uint8_t*>(mapped.pData);
+    // D3D11 渲染格式为 BGRA，Flutter PixelBufferTexture 期望 RGBA，
+    // 需要交换 R/B 通道，否则画面颜色偏色。
+    // D3D11 renders BGRA but Flutter PixelBufferTexture expects RGBA.
+    // Swap R and B channels to produce correct colors.
+    const uint8_t* src_ptr = static_cast<const uint8_t*>(mapped.pData);
     for (UINT row = 0; row < h; row++) {
-      memcpy(pixel_data_.data() + row * w * 4,
-             src_data + row * mapped.RowPitch, w * 4);
+      const uint32_t* src_row =
+          reinterpret_cast<const uint32_t*>(src_ptr + row * mapped.RowPitch);
+      uint32_t* dst_row =
+          reinterpret_cast<uint32_t*>(pixel_data_.data() + row * w * 4);
+      for (UINT col = 0; col < w; col++) {
+        uint32_t px = src_row[col];  // B G R A
+        dst_row[col] = (px & 0xFF00FF00u)           // keep G and A
+                     | ((px & 0x00FF0000u) >> 16)    // B → R position
+                     | ((px & 0x000000FFu) << 16);   // R → B position
+      }
     }
   }
   d3d_context_->Unmap(staging_tex_.Get(), 0);

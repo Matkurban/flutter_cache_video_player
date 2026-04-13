@@ -72,6 +72,10 @@ static int64_t GetIntArg(
 // Custom window message to notify the platform thread to drain pending events.
 static constexpr UINT WM_DRAIN_EVENTS = WM_APP + 0x100;
 
+// SetTimer ID，用于驱动 PollAndRender 的 WM_TIMER 消息。
+// SetTimer ID for WM_TIMER messages driving PollAndRender.
+static constexpr UINT_PTR kFrameTimerId = 1;
+
 NativeVideoPlayer::NativeVideoPlayer(flutter::TextureRegistrar* registrar,
                                       HWND hwnd)
     : texture_registrar_(registrar) {
@@ -219,10 +223,6 @@ void NativeVideoPlayer::OnMediaEvent(DWORD event, DWORD_PTR p1, DWORD p2) {
 void NativeVideoPlayer::PollAndRender() {
   if (!media_engine_) return;
 
-  // 确保定时器池线程已初始化 COM（多次调用幂等安全）。
-  // Ensure the timer-pool thread has COM initialized (idempotent, safe to call repeatedly).
-  CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-
   // 1. 检查错误 / Check for error
   ComPtr<IMFMediaError> err;
   media_engine_->GetError(&err);
@@ -320,23 +320,22 @@ void NativeVideoPlayer::PollAndRender() {
   texture_registrar_->MarkTextureFrameAvailable(texture_id_);
 }
 
-// ── 帧定时器 / Frame timer ──
+// ── 帧定时器（基于窗口消息循环）/ Frame timer (window message loop based) ──
+//
+// 使用 SetTimer 而非 CreateTimerQueueTimer，使 PollAndRender 在平台线程上
+// 通过 WM_TIMER 消息执行。这样 SendEvent 可直接访问 EventSink，
+// 无需跨线程 PostMessage + DrainEvents。
+// Uses SetTimer instead of CreateTimerQueueTimer so PollAndRender runs on the
+// platform thread via WM_TIMER. SendEvent can access EventSink directly
+// without cross-thread PostMessage + DrainEvents.
 
 void NativeVideoPlayer::StartFrameTimer() {
   StopFrameTimer();
-  CreateTimerQueueTimer(&timer_handle_, nullptr, OnTimer, this, 0, 16,
-                         WT_EXECUTEDEFAULT);
+  ::SetTimer(hwnd_, kFrameTimerId, 16, nullptr);
 }
 
 void NativeVideoPlayer::StopFrameTimer() {
-  if (timer_handle_) {
-    DeleteTimerQueueTimer(nullptr, timer_handle_, INVALID_HANDLE_VALUE);
-    timer_handle_ = nullptr;
-  }
-}
-
-void CALLBACK NativeVideoPlayer::OnTimer(PVOID ctx, BOOLEAN) {
-  static_cast<NativeVideoPlayer*>(ctx)->PollAndRender();
+  ::KillTimer(hwnd_, kFrameTimerId);
 }
 
 // ── 事件发送（线程安全） / Thread-safe event sending ──
@@ -571,6 +570,10 @@ std::optional<LRESULT> FlutterCacheVideoPlayerPlugin::HandleWindowMessage(
     HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == WM_DRAIN_EVENTS && player_) {
     player_->DrainEvents();
+    return 0;
+  }
+  if (message == WM_TIMER && wparam == kFrameTimerId && player_) {
+    player_->PollAndRender();
     return 0;
   }
   return std::nullopt;

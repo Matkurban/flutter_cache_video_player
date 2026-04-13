@@ -97,7 +97,6 @@ class NativeVideoPlayer {
   void PollAndRender();
   void StartFrameTimer();
   void StopFrameTimer();
-  static void CALLBACK OnTimer(PVOID ctx, BOOLEAN fired);
   void SendEvent(const std::string& name, const flutter::EncodableValue& val);
   void Cleanup();
 
@@ -126,7 +125,6 @@ class NativeVideoPlayer {
   FlutterDesktopPixelBuffer pixel_buf_{};
   std::mutex buf_mutex_;
 
-  HANDLE timer_handle_ = nullptr;
   UINT video_w_ = 0;
   UINT video_h_ = 0;
   UINT reset_token_ = 0;

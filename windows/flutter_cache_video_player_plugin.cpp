@@ -233,11 +233,16 @@ void NativeVideoPlayer::PollAndRender() {
     }
   }
 
-  // 3. 播放状态 / Playing state
-  bool playing = (media_engine_->IsPaused() == FALSE);
-  if (playing != last_playing_) {
-    SendEvent("playing", flutter::EncodableValue(playing));
-    last_playing_ = playing;
+  // 3. 播放状态（仅在已获取数据后才有意义，避免在加载阶段误报 playing=true）
+  // Playing state – only meaningful after media has data.
+  // IsPaused()==FALSE right after Play() even before any data is loaded;
+  // reporting playing=true prematurely defeats the Dart _hasPlayedSinceOpen guard.
+  if (readyState >= MF_MEDIA_ENGINE_READY_HAVE_CURRENT_DATA) {
+    bool playing = (media_engine_->IsPaused() == FALSE);
+    if (playing != last_playing_) {
+      SendEvent("playing", flutter::EncodableValue(playing));
+      last_playing_ = playing;
+    }
   }
 
   // 4. 缓冲状态 / Buffering state
@@ -249,9 +254,10 @@ void NativeVideoPlayer::PollAndRender() {
     last_buffering_ = buffering;
   }
 
-  // 5. 播放结束 / Ended
+  // 5. 播放结束（仅在元数据已就绪后才有意义，防止加载失败时误报完成）
+  // Ended – only meaningful after duration was received (media actually loaded).
   bool ended = (media_engine_->IsEnded() != FALSE);
-  if (ended && !last_ended_) {
+  if (ended && !last_ended_ && duration_sent_) {
     SendEvent("completed", flutter::EncodableValue(nullptr));
     last_ended_ = true;
     return;

@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import '../core/logger.dart';
 import '../proxy/proxy_server.dart';
 
 /// 平台播放工厂，根据平台返回代理 URL 或原始 URL。
@@ -10,24 +9,24 @@ class PlatformPlayerFactory {
   PlatformPlayerFactory({this.proxyServer});
 
   /// 创建播放器所用的媒体 URL。
-  /// 原生端（含 Windows）：已完全缓存时使用 file:// URL，否则走本地 HTTP 代理。
+  /// 原生端：先预初始化缓存元数据，然后始终走本地 HTTP 代理（代理会发送正确的 Content-Type）。
   /// Web 端：使用原始 URL。
   ///
   /// Creates the media URL for the player.
-  /// Native (including Windows): uses file:// for fully cached media, otherwise local HTTP proxy.
+  /// Native: pre-initializes cache metadata, then always uses local HTTP proxy
+  /// (proxy sends correct Content-Type headers, avoiding file-extension issues).
   /// Web: uses original URL.
   Future<String> createMediaUrl(String originalUrl) async {
     if (kIsWeb || proxyServer == null) {
       return originalUrl;
     }
 
-    // 所有原生平台：优先检查是否已完全缓存，命中则直接 file:// 播放。
-    // All native platforms: check for fully cached file first, play via file:// if available.
-    final cachedUrl = await proxyServer!.getCachedFileUrl(originalUrl);
-    if (cachedUrl != null) {
-      Logger.info('Playing from cache: $cachedUrl');
-      return cachedUrl;
-    }
+    // 预初始化：在返回代理 URL 前先从源服务器获取元数据（大小、MIME 类型）。
+    // 这样当原生播放器连接代理时，MediaIndex 已就绪，代理可立即响应。
+    // Pre-initialize: fetch metadata (size, MIME type) from origin server before
+    // returning the proxy URL. When the native player connects, existing
+    // MediaIndex lets the proxy respond immediately instead of blocking.
+    await proxyServer!.initCache(originalUrl);
 
     return proxyServer!.proxyUrl(originalUrl);
   }

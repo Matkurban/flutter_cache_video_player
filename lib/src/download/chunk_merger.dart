@@ -1,5 +1,4 @@
 import 'dart:io';
-import '../core/logger.dart';
 import '../utils/file_utils.dart';
 
 /// 分片合并器，将多个 chunk 文件合并为单一 data.bin。
@@ -12,7 +11,6 @@ class ChunkMerger {
     final outputFile = File(outputPath);
 
     if (await outputFile.exists()) {
-      Logger.debug('Merged file already exists: $outputPath');
       return outputPath;
     }
 
@@ -40,8 +38,6 @@ class ChunkMerger {
           await File(chunkPath).delete();
         } catch (_) {}
       }
-
-      Logger.info('Merged $totalChunks chunks into $outputPath');
       return outputPath;
     } catch (e) {
       await raf.close();

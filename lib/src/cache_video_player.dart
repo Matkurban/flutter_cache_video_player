@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_video_player/src/data/tables.dart';
 import 'package:tostore/tostore.dart';
 import 'core/constants.dart';
-import 'core/logger.dart';
 import 'core/platform_detector.dart';
 import 'data/cache_index_db.dart';
 import 'data/repositories/cache_repository.dart';
@@ -94,7 +93,6 @@ class FlutterCacheVideoPlayer {
     // Player
     _playerFactory = PlatformPlayerFactory(proxyServer: _proxyServer);
     _initialized = true;
-    Logger.info('FlutterCacheVideoPlayer initialized');
   }
 
   static List<TableSchema> get tableSchemas => Tables.allTables;

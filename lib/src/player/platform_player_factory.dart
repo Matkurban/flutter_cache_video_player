@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import '../core/logger.dart';
 import '../proxy/proxy_server.dart';
 
 /// 平台播放工厂，根据平台返回代理 URL 或原始 URL。
@@ -32,7 +31,6 @@ class PlatformPlayerFactory {
     try {
       await proxyServer!.initCache(originalUrl);
     } catch (e) {
-      Logger.warning('initCache failed, falling back to direct URL: $e');
       return originalUrl;
     }
 

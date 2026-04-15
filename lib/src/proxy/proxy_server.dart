@@ -4,7 +4,6 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:signals_flutter/signals_flutter.dart';
 import '../core/constants.dart';
-import '../core/logger.dart';
 import '../data/models/media_index.dart';
 import '../data/models/chunk_bitmap.dart';
 import '../data/repositories/cache_repository.dart';
@@ -26,6 +25,7 @@ class ProxyCacheServer {
   ProxyCacheServer({required this.config, required this.cacheRepo, required this.downloadManager});
 
   int get port => _port;
+
   String get baseUrl => 'http://127.0.0.1:$_port';
 
   /// 将原始 URL 转换为本地代理 URL。
@@ -42,7 +42,6 @@ class ProxyCacheServer {
 
     _server = await shelf_io.serve(handler, '127.0.0.1', 0);
     _port = _server!.port;
-    Logger.info('ProxyCacheServer started on $baseUrl');
   }
 
   Future<Response> _handleRequest(Request request) async {
@@ -57,13 +56,9 @@ class ProxyCacheServer {
       return Response(400, body: 'Missing url parameter');
     }
 
-    final rangeHeader = request.headers['range'];
-    Logger.info('Proxy request: ${request.method} range=$rangeHeader');
-
     try {
       return await _handleStreamRequest(request, url);
-    } catch (e, st) {
-      Logger.error('Proxy error for $url', e, st);
+    } catch (e) {
       return Response.internalServerError(body: e.toString());
     }
   }
@@ -76,7 +71,6 @@ class ProxyCacheServer {
     // initCache() should have pre-initialized. If missing, return error
     // immediately instead of blocking on a remote HTTP request.
     if (mediaIndex == null) {
-      Logger.error('MediaIndex not found for $originalUrl (initCache may have failed)');
       return Response(503, body: 'Media not yet initialized');
     }
 
@@ -176,7 +170,6 @@ class ProxyCacheServer {
           if (chunkExists || mergedExists) {
             await _readLocalChunk(controller, chunkPath, mergedPath, i, readStart, readEnd);
           } else {
-            Logger.warning('Chunk $i marked complete but file missing, re-downloading');
             // 位图标记完成但文件不存在——需要先使位图失效，否则 Worker 会跳过下载。
             // Bitmap says complete but file is gone — invalidate bitmap first,
             // otherwise the download manager will skip this chunk.
@@ -354,9 +347,7 @@ class ProxyCacheServer {
         // 消耗并丢弃响应体以释放连接。
         // Drain the response body to release the connection.
         await getResponse.drain<void>();
-      } catch (e) {
-        Logger.warning('GET Range failed for $url, falling back to HEAD: $e');
-      }
+      } catch (_) {}
 
       // 降级：使用 HEAD 请求。
       // Fallback: use HEAD request.
@@ -371,13 +362,11 @@ class ProxyCacheServer {
           }
           await headResponse.drain<void>();
         } catch (e) {
-          Logger.error('HEAD request also failed for $url: $e');
           return null;
         }
       }
 
       if (contentLength <= 0) {
-        Logger.error('Cannot determine content length for $url');
         return null;
       }
 
@@ -405,11 +394,9 @@ class ProxyCacheServer {
       await downloadManager.startDownload(url, mediaIndex);
 
       return mediaIndex;
-    } on SocketException catch (e) {
-      Logger.error('SocketException initializing media $url: $e');
+    } on SocketException {
       return null;
-    } catch (e, st) {
-      Logger.error('Failed to init media: $url', e, st);
+    } catch (e) {
       return null;
     } finally {
       httpClient?.close();
@@ -460,7 +447,6 @@ class ProxyCacheServer {
       // Detect stale absolute paths and purge the old record so we start fresh.
       final dir = Directory(mediaIndex.localDir);
       if (!await dir.exists()) {
-        Logger.warning('Stale localDir detected (${mediaIndex.localDir}), purging record');
         await cacheRepo.deleteMedia(urlHash);
         mediaIndex = null; // fall through to _initMedia below
       }
@@ -485,6 +471,5 @@ class ProxyCacheServer {
   Future<void> stop() async {
     await _server?.close(force: true);
     _server = null;
-    Logger.info('ProxyCacheServer stopped');
   }
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:signals_flutter/signals_flutter.dart';
-import '../core/logger.dart';
 
 /// 原生播放器控制器，通过 MethodChannel 和 EventChannel 与各平台原生播放器通信。
 /// Native player controller communicating with platform-specific players via MethodChannel and EventChannel.
@@ -32,7 +31,6 @@ class NativePlayerController {
   /// Creates a native player instance, registers a texture, and returns the Flutter Texture ID.
   Future<int> create() async {
     _textureId = await _methodChannel.invokeMethod<int>('create');
-    Logger.info('Native player created, textureId=$_textureId');
     _listenEvents();
     return _textureId!;
   }
@@ -44,7 +42,6 @@ class NativePlayerController {
         .listen(
           _handleEvent,
           onError: (error) {
-            Logger.error('EventChannel error: $error');
             errorSignal.set(error.toString(), force: true);
           },
         );
@@ -67,12 +64,10 @@ class NativePlayerController {
         bufferingSignal.value = buffering;
       case 'error':
         final message = event['value'] as String;
-        Logger.error('Native player error: $message');
         errorSignal.set(message, force: true);
       case 'completed':
         completedSignal.set(completedSignal.value + 1, force: true);
       default:
-        Logger.warning('Unknown native event: $type');
     }
   }
 
@@ -130,9 +125,7 @@ class NativePlayerController {
     _eventSubscription = null;
     try {
       await _methodChannel.invokeMethod('dispose');
-    } catch (e) {
-      Logger.error('Error disposing native player: $e');
-    }
+    } catch (_) {}
     _textureId = null;
   }
 }

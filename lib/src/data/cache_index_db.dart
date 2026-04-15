@@ -1,6 +1,5 @@
 import 'package:flutter_cache_video_player/src/data/tables.dart';
 import 'package:tostore/tostore.dart';
-import '../core/logger.dart';
 
 /// 缓存数据库单例，负责初始化 ToStore 及注册所有表结构。
 /// Cache database singleton responsible for ToStore initialization and schema registration.
@@ -31,7 +30,6 @@ class CacheIndexDB {
           dbName: 'flutter_cache_video_player',
           schemas: Tables.allTables,
         );
-    Logger.info('CacheIndexDB initialized at $dbPath');
   }
 
   /// 关闭数据库连接。

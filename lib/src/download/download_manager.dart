@@ -3,7 +3,6 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'package:signals_flutter/signals_flutter.dart';
 import '../core/constants.dart';
-import '../core/logger.dart';
 import '../core/platform_detector.dart';
 import '../data/models/media_index.dart';
 import '../data/models/chunk_bitmap.dart';
@@ -65,7 +64,6 @@ class DownloadManager {
       if (event == null) return;
       _onWorkerEvent(event);
     });
-    Logger.info('DownloadManager initialized with $workerCount workers');
   }
 
   void _onWorkerEvent(WorkerEvent event) {
@@ -113,7 +111,6 @@ class DownloadManager {
         final incomplete = _currentBitmap!.getIncompleteChunks(_currentMedia!.totalChunks);
         if (incomplete.isEmpty) {
           await cacheRepo.markCompleted(_currentUrlHash!);
-          Logger.info('All chunks completed for $_currentUrlHash');
 
           // Trigger merge
           _mergeInBackground();
@@ -132,16 +129,12 @@ class DownloadManager {
       if (count < config.maxRetryCount) {
         _retryCount[event.chunkIndex] = count + 1;
         final delayMs = config.retryBaseDelayMs * (1 << count);
-        Logger.warning(
-          'Chunk ${event.chunkIndex} failed, retry ${count + 1}/${config.maxRetryCount} in ${delayMs}ms',
-        );
         Future.delayed(Duration(milliseconds: delayMs), () {
           _resubmitChunk(event.chunkIndex);
         });
         return;
       }
     }
-    Logger.error('Chunk ${event.chunkIndex} permanently failed: ${event.errorMessage}');
     _dispatchNext();
   }
 
@@ -257,7 +250,6 @@ class DownloadManager {
       downloadedBytes: _currentBitmap!.downloadedBytes,
     );
     await cacheRepo.updateBitmap(_currentBitmap!);
-    Logger.info('Invalidated chunk $chunkIndex bitmap, queuing re-download');
 
     // 跳过 activeChunkIndices 检查——该分片可能不在下载中。
     // Skip activeChunkIndices check — this chunk is almost certainly not active.
@@ -311,9 +303,7 @@ class DownloadManager {
         mediaDir: _currentMedia!.localDir,
         totalChunks: _currentMedia!.totalChunks,
       );
-    } catch (e) {
-      Logger.error('Chunk merge failed', e);
-    }
+    } catch (_) {}
   }
 
   /// 取消所有下载并清空队列。

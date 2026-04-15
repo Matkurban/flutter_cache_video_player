@@ -77,7 +77,6 @@ class FlutterCacheVideoPlayerController {
           }
         }
       } else if (!_hasPlayedSinceOpen) {
-        Logger.warning('Ignoring stale paused event before first playing(true)');
         return;
       }
       playState.value = playing ? PlayState.playing : PlayState.paused;
@@ -100,17 +99,14 @@ class FlutterCacheVideoPlayerController {
     VoidCallback errorEffect = effect(() {
       final error = _nativeController.errorSignal.value;
       if (error == null) return;
-      Logger.error('Player error: $error');
       errorMessage.value = error;
       playState.value = PlayState.error;
     });
     VoidCallback completedEffect = effect(() {
       _nativeController.completedSignal.value;
       if (!_hasPlayedSinceOpen) {
-        Logger.warning('Ignoring stale completed event before first playing(true)');
         return;
       }
-      Logger.info('Playback completed');
       playState.value = PlayState.stopped;
     });
     _disposers.addAll([
@@ -144,7 +140,6 @@ class FlutterCacheVideoPlayerController {
       playState.value = PlayState.loading;
 
       final mediaUrl = await FlutterCacheVideoPlayer.instance.playerFactory.createMediaUrl(url);
-      Logger.info('Opening media: $url → $mediaUrl');
 
       await _nativeController.open(mediaUrl);
 
@@ -157,12 +152,9 @@ class FlutterCacheVideoPlayerController {
           if (history != null && history.positionMs > 0) {
             _nativeController.seek(history.positionMs);
           }
-        } catch (e) {
-          Logger.error('Failed to get history for $urlHash', e);
-        }
+        } catch (_) {}
       }
-    } catch (e, st) {
-      Logger.error('Failed to open media: $url', e, st);
+    } catch (e) {
       errorMessage.value = e.toString();
       playState.value = PlayState.error;
     }

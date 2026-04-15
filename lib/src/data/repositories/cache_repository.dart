@@ -1,7 +1,6 @@
 import 'package:flutter_cache_video_player/src/data/tables.dart';
 import 'package:tostore/tostore.dart';
 import '../../core/constants.dart';
-import '../../core/logger.dart';
 import '../../utils/file_utils.dart';
 import '../../utils/url_hasher.dart';
 import '../cache_index_db.dart';
@@ -41,7 +40,6 @@ class CacheRepository {
       final bitmap = ChunkBitmap.empty(index.urlHash, index.totalChunks);
       await _db.insert(TableName.chunkBitmap, bitmap.toMap());
     });
-    Logger.info('Created media index: ${index.urlHash} (${index.totalChunks} chunks)');
   }
 
   /// 更新指定媒体的最近访问时间戳。
@@ -61,7 +59,6 @@ class CacheRepository {
           'last_accessed': DateTime.now().millisecondsSinceEpoch,
         })
         .where('url_hash', '=', urlHash);
-    Logger.info('Media $urlHash marked as completed');
   }
 
   /// 获取指定媒体的分片位图。
@@ -121,8 +118,6 @@ class CacheRepository {
     var needToFree = (currentSize + requiredBytes) - maxBytes;
     if (needToFree <= 0) return;
 
-    Logger.info('LRU eviction: need to free $needToFree bytes');
-
     final candidates = await _db.query(TableName.mediaIndex).orderByAsc('last_accessed');
 
     for (final candidate in candidates.data) {
@@ -131,7 +126,6 @@ class CacheRepository {
       if (index.urlHash == excludeHash) continue;
       await deleteMedia(index.urlHash);
       needToFree -= index.totalBytes;
-      Logger.info('Evicted: ${index.urlHash}');
     }
   }
 

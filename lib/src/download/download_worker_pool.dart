@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:isolate';
 import 'package:signals_flutter/signals_flutter.dart';
 import '../core/constants.dart';
-import '../core/logger.dart';
 import 'download_task.dart';
 import 'download_worker.dart';
 
@@ -37,7 +36,6 @@ class DownloadWorkerPool {
       _workers.add(handle);
     }
     _isReady = true;
-    Logger.info('Worker pool started with $workerCount workers');
   }
 
   Future<_WorkerHandle> _spawnWorker(int index) async {
@@ -59,13 +57,11 @@ class DownloadWorkerPool {
       } else if (message is Map<String, dynamic>) {
         final event = message['event'] as String?;
         if (event == 'ready') {
-          Logger.debug('Worker-$index ready');
         } else if (event != null) {
           _handleWorkerEvent(index, WorkerEvent.fromMessage(message));
         }
       } else if (message is List && message.length == 2) {
         // Error from isolate
-        Logger.error('Worker-$index error: ${message[0]}');
         _respawnWorker(index);
       }
     });
@@ -106,7 +102,6 @@ class DownloadWorkerPool {
   }
 
   Future<void> _respawnWorker(int index) async {
-    Logger.warning('Respawning Worker-$index');
     try {
       _workers[index].isolate.kill(priority: Isolate.immediate);
     } catch (_) {}
@@ -175,6 +170,5 @@ class DownloadWorkerPool {
     }
     _workers.clear();
     _isReady = false;
-    Logger.info('Worker pool shut down');
   }
 }

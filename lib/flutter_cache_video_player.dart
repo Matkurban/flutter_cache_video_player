@@ -1,7 +1,6 @@
 // Core
 export 'src/core/constants.dart';
 export 'src/core/platform_detector.dart';
-export 'src/core/logger.dart';
 
 // Data models
 export 'src/data/models/media_index.dart';

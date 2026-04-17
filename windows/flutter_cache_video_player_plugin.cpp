@@ -103,21 +103,42 @@ FlutterCacheVideoPlayerPlugin::FlutterCacheVideoPlayerPlugin(flutter::PluginRegi
   RegisterClassExW(&wc);
   message_window_ = CreateWindowExW(0, kMessageWindowClass, L"", 0, 0, 0, 0, 0,
                                     HWND_MESSAGE, nullptr, wc.hInstance, this);
-  if (message_window_)
+  if (message_window_) {
     SetWindowLongPtrW(message_window_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+    // Poll mpv ~60 times per second on the platform thread. This is the
+    // authoritative way to guarantee event/frame delivery: the async wakeup
+    // callbacks + PostMessageW path historically has unreliable delivery in
+    // the Flutter Windows embedder message loop (manifests as audio playing
+    // but no duration/position/playing events ever reach Dart, leaving the
+    // UI stuck in "loading"). A 16 ms timer fires WM_TIMER from the platform
+    // thread regardless, so DrainEvents + Render always run.
+    SetTimer(message_window_, /*id=*/1, /*ms=*/16, nullptr);
+  }
 }
 
 FlutterCacheVideoPlayerPlugin::~FlutterCacheVideoPlayerPlugin() {
   DisposePlayer();
-  if (message_window_) { DestroyWindow(message_window_); message_window_ = nullptr; }
+  if (message_window_) {
+    KillTimer(message_window_, 1);
+    DestroyWindow(message_window_);
+    message_window_ = nullptr;
+  }
 }
 
 LRESULT CALLBACK FlutterCacheVideoPlayerPlugin::MessageProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l) {
   auto* self = reinterpret_cast<FlutterCacheVideoPlayerPlugin*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (!self) return DefWindowProcW(hwnd, msg, w, l);
-  if (msg == kMsgDrain) {
+  if (msg == kMsgDrain || msg == WM_TIMER) {
     self->drain_posted_.store(false);
-    if (self->player_) self->player_->DrainEvents();
+    if (self->player_) {
+      self->player_->DrainEvents();
+      // Also attempt a render on every tick — the mpv SW render context needs
+      // to be polled to produce the first frame, and a render-update callback
+      // is not guaranteed to fire on every platform.
+      if (self->player_->Render() && self->texture_id_ >= 0) {
+        self->texture_registrar_->MarkTextureFrameAvailable(self->texture_id_);
+      }
+    }
     return 0;
   }
   if (msg == kMsgRender) {

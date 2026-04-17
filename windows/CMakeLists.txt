@@ -234,8 +234,18 @@ add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
   "${FLUTTER_LIBRARY}" $<TARGET_FILE_DIR:${TEST_RUNNER}>
 )
+# The test binary links libmpv; ensure the runtime DLL sits next to the exe so
+# that gtest_discover_tests can launch it during the build.
+if(MPV_RUNTIME_DLL)
+  add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${MPV_RUNTIME_DLL}" $<TARGET_FILE_DIR:${TEST_RUNNER}>
+  )
+endif()
 
-# Enable automatic test discovery.
+# Enable automatic test discovery. Use PRE_TEST so the test executable is only
+# launched at `ctest` time, not during the build; this avoids build failures
+# when the DLL search path is not yet fully populated.
 include(GoogleTest)
-gtest_discover_tests(${TEST_RUNNER})
+gtest_discover_tests(${TEST_RUNNER} DISCOVERY_MODE PRE_TEST)
 endif()

@@ -151,6 +151,7 @@ class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
   late bool _visible = widget.initiallyVisible;
   Timer? _hideTimer;
   VoidCallback? _playingDisposer;
+  VoidCallback? _completedDisposer;
 
   @override
   void initState() {
@@ -163,12 +164,22 @@ class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
         _hideTimer?.cancel();
       }
     });
+    // Always surface controls when playback finishes so the replay button
+    // is visible. Without this, if the user had hidden controls mid-playback
+    // they'd see an empty frame at the end with no obvious way to restart.
+    _completedDisposer = effect(() {
+      final state = widget.controller.playState.value;
+      if (state == PlayState.stopped) {
+        _showControls(scheduleAutoHide: false);
+      }
+    });
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
     _playingDisposer?.call();
+    _completedDisposer?.call();
     super.dispose();
   }
 
@@ -466,6 +477,7 @@ class _DefaultCenterControls extends StatelessWidget {
         final state = controller.playState.value;
         final buffering = controller.isBuffering.value;
         final isPlaying = state == PlayState.playing;
+        final isCompleted = state == PlayState.stopped;
         final canInteract = state != PlayState.loading && state != PlayState.error;
 
         Widget centerButton;
@@ -477,6 +489,18 @@ class _DefaultCenterControls extends StatelessWidget {
               color: style.foregroundColor,
               radius: style.centerPrimaryIconSize / 3,
             ),
+          );
+        } else if (isCompleted) {
+          centerButton = PlayerIconButton(
+            icon: CupertinoIcons.arrow_counterclockwise,
+            size: style.centerPrimaryIconSize,
+            color: style.foregroundColor,
+            onPressed: () async {
+              await controller.seek(Duration.zero);
+              await controller.play();
+              onInteract();
+            },
+            semanticsLabel: 'Replay',
           );
         } else {
           centerButton = PlayerIconButton(

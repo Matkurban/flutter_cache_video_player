@@ -169,6 +169,16 @@ bool MpvPlayer::Initialize(std::string* error) {
   SetOptionString(mpv_, "hwdec", "no");
   SetOptionString(mpv_, "vo", "libmpv");
   SetOptionString(mpv_, "idle", "yes");
+  // Force libavformat to seek and probe aggressively so that MP4/MOV files
+  // whose `moov` atom sits at the tail (i.e. not faststart-optimized) report
+  // the correct duration instead of an early guess based on bitrate.
+  // Without these the demuxer will happily stop after the first few MB, and
+  // the reported duration for a 27-second tail-moov clip comes out as ~8 s.
+  // `force-seekable=yes` ensures mpv will attempt byte-range seeks through
+  // our HTTP cache proxy, which supports Range requests.
+  SetOptionString(mpv_, "force-seekable", "yes");
+  SetOptionString(mpv_, "demuxer-lavf-probesize", "50000000");       // 50 MB
+  SetOptionString(mpv_, "demuxer-lavf-analyzeduration", "10000000"); // 10 s
 
   if (mpv_initialize(mpv_) < 0) {
     if (error) *error = "mpv_initialize failed";

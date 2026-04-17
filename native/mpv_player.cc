@@ -159,7 +159,13 @@ bool MpvPlayer::Initialize(std::string* error) {
   SetOptionString(mpv_, "msg-level", "all=warn");
   SetOptionString(mpv_, "audio-display", "no");
   SetOptionString(mpv_, "keep-open", "yes");
-  SetOptionString(mpv_, "hwdec", "auto-safe");
+  // IMPORTANT: we render through MPV_RENDER_API_TYPE_SW (CPU-side RGBA).
+  // Hardware-decoded frames live in GPU memory and libmpv's SW render path
+  // cannot reliably read them back on Windows/Linux, which manifests as audio
+  // playing but the texture never receiving a frame. Force software decoding
+  // for the playback pipeline. (Snapshots & cover extraction use independent
+  // mpv_handles and are unaffected.)
+  SetOptionString(mpv_, "hwdec", "no");
   SetOptionString(mpv_, "vo", "libmpv");
   SetOptionString(mpv_, "idle", "yes");
 
@@ -413,7 +419,13 @@ bool MpvPlayer::PerformRender(uint32_t w, uint32_t h) {
       {MPV_RENDER_PARAM_INVALID, nullptr},
   };
   int rc = mpv_render_context_render(render_ctx_, params);
-  if (rc < 0) return false;
+  if (rc < 0) {
+    if (on_error_) {
+      on_error_(std::string("mpv_render_context_render failed: ") +
+                mpv_error_string(rc));
+    }
+    return false;
+  }
 
   sw_w_.store(w, std::memory_order_release);
   sw_h_.store(h, std::memory_order_release);

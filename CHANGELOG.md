@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.3.0...v1.4.0) (2026-04-17)
+
+
+### Features
+
+* fix windows play bugs ([65319bb](https://github.com/Matkurban/flutter_cache_video_player/commit/65319bbaea68807d925aeaea9a6d7c7e9496d768))
+
 ## [1.3.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.2.0...v1.3.0) (2026-04-17)
 
 

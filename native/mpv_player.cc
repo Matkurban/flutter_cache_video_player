@@ -408,7 +408,13 @@ bool MpvPlayer::PerformRender(uint32_t w, uint32_t h) {
   if (sw_buffer_.size() < needed) sw_buffer_.resize(needed);
 
   int size[2] = {static_cast<int>(w), static_cast<int>(h)};
-  const char* sw_format = "rgb0";  // R,G,B,0
+  // libmpv supports `rgb0` on every build (rgba is not universally available).
+  // The 4th byte is left unspecified — we zero-fill it to 0xFF below so the
+  // Flutter Windows compositor (which multiplies against the alpha channel)
+  // doesn't render the frame as fully transparent. Without this, Windows
+  // shows audio-only playback with a seemingly-stuck "loading" overlay even
+  // though frames are being produced.
+  const char* sw_format = "rgb0";
   int stride = static_cast<int>(w) * 4;
   void* ptr = sw_buffer_.data();
   mpv_render_param params[] = {
@@ -425,6 +431,14 @@ bool MpvPlayer::PerformRender(uint32_t w, uint32_t h) {
                 mpv_error_string(rc));
     }
     return false;
+  }
+
+  // Force opaque alpha. rgb0's 4th byte is unspecified/zero, and Flutter's
+  // texture compositors (Windows and some embedders) blend against it.
+  {
+    uint8_t* p = sw_buffer_.data();
+    const size_t pixels = static_cast<size_t>(w) * h;
+    for (size_t i = 0; i < pixels; ++i) p[i * 4 + 3] = 0xFF;
   }
 
   sw_w_.store(w, std::memory_order_release);

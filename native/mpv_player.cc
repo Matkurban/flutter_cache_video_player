@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -319,13 +320,21 @@ void MpvPlayer::HandleMpvEvent(mpv_event* ev) {
         case kPropTimePos:
           if (prop->format == MPV_FORMAT_DOUBLE && prop->data) {
             double v = *static_cast<double*>(prop->data);
-            if (on_position_) on_position_(static_cast<int64_t>(v * 1000));
+            // mpv occasionally reports NaN/Inf for time-pos during seeks or
+            // before the first frame is decoded. Casting a non-finite double
+            // to int64_t is UB and historically gave astronomical values that
+            // the UI then displayed as the "duration".
+            if (std::isfinite(v) && v >= 0.0) {
+              if (on_position_) on_position_(static_cast<int64_t>(v * 1000));
+            }
           }
           break;
         case kPropDuration:
           if (prop->format == MPV_FORMAT_DOUBLE && prop->data) {
             double v = *static_cast<double*>(prop->data);
-            if (on_duration_) on_duration_(static_cast<int64_t>(v * 1000));
+            if (std::isfinite(v) && v >= 0.0) {
+              if (on_duration_) on_duration_(static_cast<int64_t>(v * 1000));
+            }
           }
           break;
         case kPropPause:

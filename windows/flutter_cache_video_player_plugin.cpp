@@ -105,14 +105,11 @@ FlutterCacheVideoPlayerPlugin::FlutterCacheVideoPlayerPlugin(flutter::PluginRegi
                                     HWND_MESSAGE, nullptr, wc.hInstance, this);
   if (message_window_) {
     SetWindowLongPtrW(message_window_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
-    // Poll mpv ~60 times per second on the platform thread. This is the
-    // authoritative way to guarantee event/frame delivery: the async wakeup
-    // callbacks + PostMessageW path historically has unreliable delivery in
-    // the Flutter Windows embedder message loop (manifests as audio playing
-    // but no duration/position/playing events ever reach Dart, leaving the
-    // UI stuck in "loading"). A 16 ms timer fires WM_TIMER from the platform
-    // thread regardless, so DrainEvents + Render always run.
-    SetTimer(message_window_, /*id=*/1, /*ms=*/16, nullptr);
+    // Safety-net poll: fires WM_TIMER at 100 Hz (every 10 ms is overkill — we
+    // use 100 ms which is invisible for UI state but still catches any lost
+    // cross-thread wakeup). Rendering is still driven by mpv's render-update
+    // callback, so this does not burn CPU on video decode.
+    SetTimer(message_window_, /*id=*/1, /*ms=*/100, nullptr);
   }
 }
 
@@ -129,16 +126,13 @@ LRESULT CALLBACK FlutterCacheVideoPlayerPlugin::MessageProc(HWND hwnd, UINT msg,
   auto* self = reinterpret_cast<FlutterCacheVideoPlayerPlugin*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (!self) return DefWindowProcW(hwnd, msg, w, l);
   if (msg == kMsgDrain || msg == WM_TIMER) {
+    // Safety-net path for events only: WM_TIMER fires on the platform thread
+    // regardless of whether the cross-thread PostMessageW from mpv's wakeup
+    // callback made it through. We do NOT render here — rendering is still
+    // driven by mpv's update callback via kMsgRender so we don't burn CPU
+    // on every tick.
     self->drain_posted_.store(false);
-    if (self->player_) {
-      self->player_->DrainEvents();
-      // Also attempt a render on every tick — the mpv SW render context needs
-      // to be polled to produce the first frame, and a render-update callback
-      // is not guaranteed to fire on every platform.
-      if (self->player_->Render() && self->texture_id_ >= 0) {
-        self->texture_registrar_->MarkTextureFrameAvailable(self->texture_id_);
-      }
-    }
+    if (self->player_) self->player_->DrainEvents();
     return 0;
   }
   if (msg == kMsgRender) {

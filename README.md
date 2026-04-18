@@ -426,6 +426,73 @@ On Web, cover extraction requires the video server to send CORS headers
 allowing `crossOrigin="anonymous"` — otherwise the canvas is tainted and the
 method returns an empty list.
 
+## Getting Video Duration
+
+### `FlutterCacheVideoPlayer.instance.getDuration()` — probe total duration
+
+Accurately reads the total duration of any [`VideoSource`] **without** creating
+a player, texture, or starting playback. This is the recommended way to show
+durations in lists / thumbnails / previews, or to pre-validate a URL before
+opening it in a full player.
+
+```dart
+final duration = await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.network('https://example.com/video.mp4'),
+  timeout: const Duration(seconds: 10),
+);
+if (duration != null) {
+  debugPrint('Total duration: ${duration.inMilliseconds} ms');
+}
+```
+
+Works with any `VideoSource`:
+
+```dart
+// Network — piped through the caching proxy; bytes read while probing
+// are reused by subsequent playNetwork(sameUrl) calls.
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.network('https://example.com/video.mp4'),
+);
+
+// Local file — absolute path or file:// URI.
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.file('/absolute/path/to/movie.mp4'),
+);
+
+// Flutter asset — extracted to the temp directory on first use.
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.asset('assets/videos/intro.mp4'),
+);
+```
+
+### Platform support for duration
+
+| Platform | Backend                                                    |
+|----------|------------------------------------------------------------|
+| iOS      | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`|
+| macOS    | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`|
+| Android  | `MediaMetadataRetriever` (`METADATA_KEY_DURATION`)         |
+| Linux    | libmpv short-lived probe (same tail-moov-safe demuxer flags as the main player) |
+| Windows  | libmpv short-lived probe (same tail-moov-safe demuxer flags as the main player) |
+| Web      | Offscreen `<video preload="metadata">` + `loadedmetadata`  |
+
+**Notes**
+
+- Returns `null` on failure, timeout, or non-finite durations (live streams,
+  HLS without a `#EXT-X-ENDLIST` marker). Callers should handle `null`.
+- Network sources are routed through the plugin's proxy whenever
+  `initialize()` has been called — probed bytes (HTTP headers and the first
+  chunk the demuxer needs to read duration) become part of the normal download
+  cache.
+- On Linux / Windows the probe applies `demuxer-lavf-probesize=50 MB` and
+  `demuxer-lavf-analyzeduration=10 s` so tail-moov MP4s (where the `moov`
+  atom is at the end of the file) report their real duration instead of a
+  truncated estimate.
+- On Web the server must permit `crossOrigin="anonymous"`; on CORS failure
+  the method returns `null`.
+- The method never throws — pass a short `timeout` (e.g. `Duration(seconds:
+  2)`) when building responsive UIs.
+
 ## Example
 
 See the [example](example/) directory for a complete app demonstrating:

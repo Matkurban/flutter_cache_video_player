@@ -78,6 +78,9 @@ class FlutterCacheVideoPlayerWeb {
       case 'extractCovers':
         final args = Map<String, dynamic>.from(call.arguments as Map);
         return _extractCovers(args);
+      case 'getDuration':
+        final args = Map<String, dynamic>.from(call.arguments as Map);
+        return _getDuration(args);
       case 'getPlatformVersion':
         return 'Web';
       default:
@@ -298,6 +301,41 @@ class FlutterCacheVideoPlayerWeb {
           ((b['brightness'] as num).toDouble()).compareTo((a['brightness'] as num).toDouble()),
     );
     return frames.take(count).toList();
+  }
+
+  /// 使用离屏 `<video>` 元素仅加载媒体元数据以获取精确时长（毫秒）。
+  /// CORS 失败 / 超时 / `duration` 非有限值时返回 `null`。
+  ///
+  /// Probe accurate media duration (milliseconds) using a detached offscreen
+  /// `<video>` element with `preload=metadata`. Returns `null` on CORS
+  /// failure, timeout, or non-finite duration (HLS / live streams).
+  Future<int?> _getDuration(Map<String, dynamic> args) async {
+    final url = args['url'] as String? ?? '';
+    final timeoutMs = (args['timeoutMs'] as int?) ?? 15000;
+    if (url.isEmpty) return null;
+
+    final video = html.HTMLVideoElement()
+      ..crossOrigin = 'anonymous'
+      ..muted = true
+      ..preload = 'metadata'
+      ..src = url;
+    try {
+      await video.onLoadedMetadata.first.timeout(Duration(milliseconds: timeoutMs));
+    } catch (_) {
+      try {
+        video.removeAttribute('src');
+      } catch (_) {}
+      return null;
+    }
+    try {
+      final seconds = video.duration;
+      if (!seconds.isFinite || seconds <= 0) return null;
+      return (seconds * 1000).toInt();
+    } finally {
+      try {
+        video.removeAttribute('src');
+      } catch (_) {}
+    }
   }
 
   double _canvasAverageBrightness(html.CanvasRenderingContext2D ctx, int width, int height) {

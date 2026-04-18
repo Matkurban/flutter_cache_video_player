@@ -277,6 +277,26 @@ static void handle_method_call(FlutterCacheVideoPlayerPlugin* self, FlMethodCall
       fl_value_append(list, m);
     }
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(list));
+  } else if (strcmp(method, "getDuration") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    const gchar* url = "";
+    int timeout_ms = 15000;
+    if (args) {
+      FlValue* v_url = fl_value_lookup_string(args, "url");
+      FlValue* v_to = fl_value_lookup_string(args, "timeoutMs");
+      if (v_url) url = fl_value_get_string(v_url);
+      if (v_to) timeout_ms = static_cast<int>(fl_value_get_int(v_to));
+    }
+    int64_t duration_ms = 0;
+    if (url && *url) {
+      duration_ms = MpvPlayer::GetDurationMs(url, timeout_ms);
+    }
+    if (duration_ms > 0) {
+      g_autoptr(FlValue) out = fl_value_new_int(duration_ms);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(out));
+    } else {
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+    }
   } else if (strcmp(method, "getPlatformVersion") == 0) {
     response = get_platform_version();
   } else {

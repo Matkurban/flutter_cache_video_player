@@ -316,6 +316,28 @@ void FlutterCacheVideoPlayerPlugin::HandleMethodCall(
     }).detach();
     return;
   }
+  if (name == "getDuration") {
+    std::string url;
+    int timeout_ms = 15000;
+    if (args) {
+      if (const auto* v = GetArg<std::string>(args, "url")) url = *v;
+      if (const auto* v = GetArg<int32_t>(args, "timeoutMs")) timeout_ms = *v;
+      else if (const auto* v64 = GetArg<int64_t>(args, "timeoutMs")) timeout_ms = static_cast<int>(*v64);
+    }
+    auto shared = std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>>(result.release());
+    std::thread([url, timeout_ms, shared]() {
+      int64_t duration_ms = 0;
+      if (!url.empty()) {
+        duration_ms = MpvPlayer::GetDurationMs(url, timeout_ms);
+      }
+      if (duration_ms > 0) {
+        shared->Success(flutter::EncodableValue(duration_ms));
+      } else {
+        shared->Success(flutter::EncodableValue());
+      }
+    }).detach();
+    return;
+  }
   if (name == "getPlatformVersion") {
     // Use RtlGetVersion (ntdll) to get the real OS build; GetVersion /
     // GetVersionEx are deprecated and lie on Windows 8.1+ without a manifest.

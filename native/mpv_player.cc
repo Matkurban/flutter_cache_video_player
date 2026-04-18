@@ -708,4 +708,76 @@ std::vector<CoverFrame> MpvPlayer::ExtractCovers(const std::string& url,
   return result;
 }
 
+int64_t MpvPlayer::GetDurationMs(const std::string& url,
+                                 int timeout_ms,
+                                 std::string* error) {
+  if (url.empty()) {
+    if (error) *error = "empty url";
+    return 0;
+  }
+
+  mpv_handle* h = mpv_create();
+  if (!h) {
+    if (error) *error = "mpv_create failed";
+    return 0;
+  }
+  struct Guard {
+    mpv_handle* h;
+    ~Guard() { if (h) mpv_terminate_destroy(h); }
+  } guard{h};
+
+  SetOptionString(h, "config", "no");
+  SetOptionString(h, "terminal", "no");
+  SetOptionString(h, "msg-level", "all=error");
+  SetOptionString(h, "audio", "no");
+  SetOptionString(h, "vid", "no");
+  SetOptionString(h, "vo", "null");
+  SetOptionString(h, "ao", "null");
+  SetOptionString(h, "hwdec", "no");
+  SetOptionString(h, "pause", "yes");
+  SetOptionString(h, "keep-open", "yes");
+  // Mirror the main player's demuxer probe knobs so tail-moov MP4s report
+  // the correct total duration instead of a truncated estimate.
+  SetOptionString(h, "force-seekable", "yes");
+  SetOptionString(h, "demuxer-lavf-probesize", "50000000");
+  SetOptionString(h, "demuxer-lavf-analyzeduration", "10000000");
+
+  if (mpv_initialize(h) < 0) {
+    if (error) *error = "mpv_initialize failed";
+    return 0;
+  }
+
+  const char* load[] = {"loadfile", url.c_str(), "replace", nullptr};
+  if (mpv_command(h, load) < 0) {
+    if (error) *error = "loadfile failed";
+    return 0;
+  }
+
+  const int wait_ms = timeout_ms > 0 ? timeout_ms : 15000;
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(wait_ms);
+  bool loaded = false;
+  while (std::chrono::steady_clock::now() < deadline) {
+    mpv_event* ev = mpv_wait_event(h, 0.2);
+    if (!ev) continue;
+    if (ev->event_id == MPV_EVENT_FILE_LOADED) { loaded = true; break; }
+    if (ev->event_id == MPV_EVENT_END_FILE) break;
+  }
+  if (!loaded) {
+    if (error) *error = "timeout waiting for file load";
+    return 0;
+  }
+
+  double duration = 0.0;
+  if (mpv_get_property(h, "duration", MPV_FORMAT_DOUBLE, &duration) < 0) {
+    if (error) *error = "could not read duration";
+    return 0;
+  }
+  if (!std::isfinite(duration) || duration <= 0.0) {
+    if (error) *error = "non-finite duration";
+    return 0;
+  }
+  return static_cast<int64_t>(duration * 1000.0);
+}
+
 }  // namespace flutter_cache_video_player

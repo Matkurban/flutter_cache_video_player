@@ -94,6 +94,7 @@ class FlutterCacheVideoPlayerPlugin :
             "dispose" -> handleDispose(result)
             "takeSnapshot" -> handleTakeSnapshot(result)
             "extractCovers" -> handleExtractCovers(call, result)
+            "getDuration" -> handleGetDuration(call, result)
             "getPlatformVersion" -> result.success("Android ${android.os.Build.VERSION.RELEASE}")
             else -> result.notImplemented()
         }
@@ -279,6 +280,34 @@ class FlutterCacheVideoPlayerPlugin :
                 mainHandler.post {
                     result.error("SNAPSHOT_FAIL", t.message ?: "snapshot failed", null)
                 }
+            } finally {
+                try { retriever.release() } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    /// 读取视频总时长（毫秒）。失败返回 `null`。
+    /// Read total media duration (ms). Returns null on failure.
+    private fun handleGetDuration(call: MethodCall, result: Result) {
+        val url = call.argument<String>("url")
+        val appContext = flutterPluginBinding?.applicationContext
+        if (url.isNullOrEmpty()) {
+            result.success(null)
+            return
+        }
+        workerExecutor.execute {
+            val retriever = MediaMetadataRetriever()
+            try {
+                setDataSourceForUrl(retriever, url, appContext)
+                val durMs = retriever
+                    .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull()
+                mainHandler.post {
+                    if (durMs == null || durMs <= 0) result.success(null)
+                    else result.success(durMs)
+                }
+            } catch (_: Throwable) {
+                mainHandler.post { result.success(null) }
             } finally {
                 try { retriever.release() } catch (_: Throwable) {}
             }

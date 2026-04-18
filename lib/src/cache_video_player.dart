@@ -14,6 +14,7 @@ import 'data/repositories/cache_repository.dart';
 import 'data/repositories/history_repository.dart';
 import 'download/download_manager.dart';
 import 'player/platform_player_factory.dart';
+import 'player/native_player_controller.dart';
 import 'proxy/proxy_server.dart';
 import 'utils/file_utils.dart';
 
@@ -167,6 +168,49 @@ class FlutterCacheVideoPlayer {
     final base = await getTemporaryDirectory();
     final dir = '${base.path}/flutter_cache_video_player/covers';
     return dir;
+  }
+
+  /// 在不创建播放器实例的前提下，精确获取任意 [VideoSource] 的总时长。
+  ///
+  /// * [NetworkVideoSource] 会走本插件的 HTTP 缓存代理——顺带把读取到的
+  ///   header / chunk 填入缓存，后续 `playNetwork` 同一地址可零成本复用。
+  /// * [FileVideoSource] / [AssetVideoSource] 直接读本地文件；asset 会被
+  ///   惰性抽取到临时目录。
+  /// * [timeout] 超时后返回 `null` 而非抛异常；失败 / 不支持同样返回 `null`。
+  ///
+  /// Accurately probe the total duration of any [VideoSource] **without**
+  /// creating a player texture or starting playback. Network sources are
+  /// piped through the local caching proxy so subsequent `playNetwork` calls
+  /// for the same URL can reuse the already-fetched bytes. File / asset
+  /// sources are read locally. Returns `null` on failure or timeout.
+  Future<Duration?> getDuration(
+    VideoSource source, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    try {
+      final resolved = await source.resolveToNativeUrl();
+
+      // Route network sources through the proxy when available so the probe
+      // shares the download cache with real playback.
+      String mediaUrl = resolved;
+      if (source is NetworkVideoSource && !kIsWeb && _initialized && _proxyServer != null) {
+        try {
+          await _proxyServer!.initCache(resolved);
+          mediaUrl = _proxyServer!.proxyUrl(resolved);
+        } catch (_) {
+          mediaUrl = resolved;
+        }
+      }
+
+      final ms = await NativePlayerController.queryDuration(
+        url: mediaUrl,
+        timeoutMs: timeout.inMilliseconds,
+      );
+      if (ms == null || ms <= 0) return null;
+      return Duration(milliseconds: ms);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 释放所有资源并关闭服务。

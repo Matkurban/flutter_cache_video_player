@@ -173,6 +173,30 @@ class NativePlayerController {
     return XFile(outPath, mimeType: 'image/png');
   }
 
+  /// 在不创建播放器实例的前提下，向原生端查询媒体的总时长（毫秒）。
+  /// 失败 / 超时 / 不支持时返回 `null`。
+  ///
+  /// Queries the total media duration in milliseconds from the native side
+  /// without creating a player instance. Returns `null` on failure, timeout,
+  /// or when the platform can't determine a finite duration.
+  static Future<int?> queryDuration({required String url, int? timeoutMs}) async {
+    try {
+      final raw = await _methodChannel.invokeMethod<dynamic>('getDuration', {
+        'url': url,
+        'timeoutMs': timeoutMs ?? 15000,
+      });
+      if (raw == null) return null;
+      if (raw is int) return raw <= 0 ? null : raw;
+      if (raw is num) {
+        final v = raw.toInt();
+        return v <= 0 ? null : v;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 调用原生 `extractCovers`，返回 [{positionMs, brightness, path}] 列表。
   /// Invokes the native `extractCovers` and returns the raw list of
   /// `{positionMs, brightness, path}` maps.

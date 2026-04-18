@@ -101,6 +101,14 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
                 outputDir: outputDir,
                 result: result
             )
+        case "getDuration":
+            guard let args = call.arguments as? [String: Any],
+                  let url = args["url"] as? String else {
+                result(FlutterError(code: "INVALID_ARG", message: "url is required", details: nil))
+                return
+            }
+            let timeoutMs = (args["timeoutMs"] as? Int) ?? 15000
+            NativeVideoPlayer.getDuration(url: url, timeoutMs: timeoutMs, result: result)
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
         default:
@@ -427,6 +435,47 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
                 let trimmed = Array(sorted.prefix(count))
                 result(trimmed)
             }
+        }
+    }
+
+    /// 读取媒体总时长（毫秒）。失败 / 超时 / 非有限值返回 `nil`。
+    /// Probe media total duration (ms). Returns `nil` on failure / timeout /
+    /// non-finite duration (live / HLS).
+    static func getDuration(
+        url: String,
+        timeoutMs: Int,
+        result: @escaping FlutterResult
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let mediaURL = URL(string: url) else {
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+            let asset = AVURLAsset(url: mediaURL)
+            let semaphore = DispatchSemaphore(value: 0)
+            var finished = false
+            asset.loadValuesAsynchronously(forKeys: ["duration"]) {
+                finished = true
+                semaphore.signal()
+            }
+            let waitResult = semaphore.wait(timeout: .now() + .milliseconds(timeoutMs))
+            guard waitResult == .success, finished else {
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+            var error: NSError?
+            let status = asset.statusOfValue(forKey: "duration", error: &error)
+            guard status == .loaded else {
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+            let seconds = CMTimeGetSeconds(asset.duration)
+            guard seconds.isFinite, seconds > 0 else {
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+            let ms = Int(seconds * 1000)
+            DispatchQueue.main.async { result(ms) }
         }
     }
 

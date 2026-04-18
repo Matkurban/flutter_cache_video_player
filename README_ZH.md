@@ -411,6 +411,70 @@ for (final f in frames) {
 Web 端做封面抽取时需要视频源返回允许 `crossOrigin="anonymous"` 的 CORS
 响应头，否则 canvas 会被标记为 tainted，方法会直接返回空列表。
 
+## 获取视频总时长
+
+### `FlutterCacheVideoPlayer.instance.getDuration()` —— 精确读取总时长
+
+在**不创建播放器、不占用纹理、不启动播放**的前提下，精确读取任意
+[`VideoSource`] 的总时长。适合做视频列表 / 封面页 / 预览时展示时长，或者
+在真正打开全屏播放器之前做 URL 合法性校验。
+
+```dart
+final duration = await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.network('https://example.com/video.mp4'),
+  timeout: const Duration(seconds: 10),
+);
+if (duration != null) {
+  debugPrint('总时长: ${duration.inMilliseconds} ms');
+}
+```
+
+支持所有 `VideoSource` 类型：
+
+```dart
+// 网络源 —— 走本插件的缓存代理；探测过程中读到的字节会顺带进缓存，
+// 之后调用 playNetwork(同一 URL) 可零重复下载。
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.network('https://example.com/video.mp4'),
+);
+
+// 本地文件 —— 绝对路径或 file:// URI。
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.file('/absolute/path/to/movie.mp4'),
+);
+
+// Flutter assets —— 首次调用会抽取到临时目录。
+await FlutterCacheVideoPlayer.instance.getDuration(
+  VideoSource.asset('assets/videos/intro.mp4'),
+);
+```
+
+### 时长获取的平台实现
+
+| 平台 | 后端实现 |
+|------|----------|
+| iOS      | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])` |
+| macOS    | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])` |
+| Android  | `MediaMetadataRetriever`（`METADATA_KEY_DURATION`）         |
+| Linux    | libmpv 短命探测实例（与主播放器共用同一套 tail-moov 友好的 demuxer 参数） |
+| Windows  | libmpv 短命探测实例（与主播放器共用同一套 tail-moov 友好的 demuxer 参数） |
+| Web      | 离屏 `<video preload="metadata">` + `loadedmetadata` 事件 |
+
+**注意事项**
+
+- 失败 / 超时 / `duration` 非有限值（直播、无 `#EXT-X-ENDLIST` 的 HLS 等）
+  都会返回 `null`，调用方需要自行判空。
+- 只要调用过 `initialize()`，网络源就会走插件的本地代理 —— 探测过程中
+  读到的字节（HTTP header + demuxer 需要读取的前若干 chunk）会直接进入
+  下载缓存。
+- Linux / Windows 的探测会启用 `demuxer-lavf-probesize=50 MB` 与
+  `demuxer-lavf-analyzeduration=10 s`，确保 tail-moov 结构的 MP4（`moov`
+  box 在文件尾部）能读到真实时长，而不是被错估成一个短值。
+- Web 端需要视频源设置允许 `crossOrigin="anonymous"` 的 CORS 响应头；
+  被浏览器拦截时该方法返回 `null`。
+- 该方法永远不抛异常。UI 场景下建议传一个较短的 `timeout`（例如
+  `Duration(seconds: 2)`）以保持响应流畅。
+
 ## 示例
 
 查看 [example](example/) 目录获取完整示例应用，包含：

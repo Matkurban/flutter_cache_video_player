@@ -83,6 +83,15 @@ class MpvPlayer {
                                                const std::string& output_dir,
                                                std::string* error = nullptr);
 
+  // Accurately probe the total duration (milliseconds) of a media URL / path
+  // without creating a player instance. Uses the same demuxer probe tweaks
+  // as the main player so tail-moov MP4s report correctly. Returns a value
+  // > 0 on success; std::nullopt-style 0 on failure / timeout / non-finite
+  // duration (live streams).
+  static int64_t GetDurationMs(const std::string& url,
+                               int timeout_ms = 15000,
+                               std::string* error = nullptr);
+
   void SetOnPosition(PositionCb cb) { on_position_ = std::move(cb); }
   void SetOnDuration(DurationCb cb) { on_duration_ = std::move(cb); }
   void SetOnPlaying(PlayingCb cb) { on_playing_ = std::move(cb); }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// [DefaultVideoPlayer] 的视觉样式，所有可自定义的颜色、尺寸、字体都集中在这里。
 /// Visual configuration for [DefaultVideoPlayer] – colors, sizes and text styles.
 @immutable
-class DefaultVideoPlayerStyle {
+class VideoPlayerStyle {
   /// 覆盖层前景色（图标、文字默认颜色）。
   /// Foreground color for overlay glyphs and text.
   final Color foregroundColor;
@@ -80,7 +80,7 @@ class DefaultVideoPlayerStyle {
   /// Scrubber thumb radius while the user is pressing or dragging.
   final double scrubberActiveThumbRadius;
 
-  const DefaultVideoPlayerStyle({
+  const VideoPlayerStyle({
     this.foregroundColor = Colors.white,
     this.backgroundColor = Colors.black,
     this.scrimIntensity = 0.55,
@@ -108,7 +108,7 @@ class DefaultVideoPlayerStyle {
     this.scrubberActiveThumbRadius = 9.0,
   });
 
-  DefaultVideoPlayerStyle copyWith({
+  VideoPlayerStyle copyWith({
     Color? foregroundColor,
     Color? backgroundColor,
     double? scrimIntensity,
@@ -129,7 +129,7 @@ class DefaultVideoPlayerStyle {
     double? scrubberThumbRadius,
     double? scrubberActiveThumbRadius,
   }) {
-    return DefaultVideoPlayerStyle(
+    return VideoPlayerStyle(
       foregroundColor: foregroundColor ?? this.foregroundColor,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       scrimIntensity: scrimIntensity ?? this.scrimIntensity,

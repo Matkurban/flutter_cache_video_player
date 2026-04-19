@@ -22,14 +22,12 @@ class CacheIndexDB {
 
   /// 初始化数据库，创建所有必需的表。
   /// Initializes the database and creates all required tables.
-  Future<void> initDatabase({required String dbPath, ToStore? tostore}) async {
-    _db =
-        tostore ??
-        await ToStore.open(
-          dbPath: dbPath,
-          dbName: 'flutter_cache_video_player',
-          schemas: Tables.allTables,
-        );
+  Future<void> initDatabase({required String dbPath}) async {
+    _db = await ToStore.open(
+      dbPath: dbPath,
+      dbName: 'flutter_cache_video_player',
+      schemas: Tables.allTables,
+    );
   }
 
   /// 关闭数据库连接。

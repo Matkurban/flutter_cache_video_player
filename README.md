@@ -23,46 +23,14 @@ support and minimal bandwidth waste.
 
 ## Platform Engines
 
-| Platform | Native Engine                             |
-|----------|-------------------------------------------|
-| Android  | ExoPlayer (Media3)                        |
-| iOS      | AVPlayer                                  |
-| macOS    | AVPlayer                                  |
-| Linux    | libmpv (software rendering)               |
-| Windows  | libmpv (software rendering)               |
-| Web      | HTML5 `<video>`                           |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Application                     │
-├─────────────────────────────────────────────────┤
-│  FlutterCacheVideoPlayer (Facade)               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-│  │ Player   │ │ Playlist │ │ Theme            │ │
-│  │ Service  │ │ Manager  │ │ Controller       │ │
-│  └────┬─────┘ └──────────┘ └──────────────────┘ │
-│       │                                          │
-│  ┌────▼─────────────────┐  ┌──────────────────┐ │
-│  │ NativePlayerController│  │ Download Manager │ │
-│  │ (MethodChannel)      │  │ (Priority Queue) │ │
-│  └────┬─────────────────┘  └────┬─────────────┘ │
-│       │                         │                │
-│  ┌────▼──────────┐  ┌──────────▼──────────────┐ │
-│  │ Proxy Server  │  │ Worker Pool (Isolates)  │ │
-│  │ (shelf HTTP)  │  │ ┌──┐ ┌──┐ ┌──┐ ┌──┐    │ │
-│  │ 127.0.0.1:0   │  │ │W1│ │W2│ │W3│ │W4│    │ │
-│  └───────────────┘  │ └──┘ └──┘ └──┘ └──┘    │ │
-│                      └────────────────────────┘ │
-│  ┌─────────────────────────────────────────────┐ │
-│  │ Cache Repository (ToStore) + Chunk Files    │ │
-│  └─────────────────────────────────────────────┘ │
-├─────────────────────────────────────────────────┤
-│  Native Platform Layer                           │
-│  ExoPlayer │ AVPlayer │  libmpv  │ libmpv │ HTML5  │
-└─────────────────────────────────────────────────┘
-```
+| Platform | Native Engine               |
+|----------|-----------------------------|
+| Android  | ExoPlayer (Media3)          |
+| iOS      | AVPlayer                    |
+| macOS    | AVPlayer                    |
+| Linux    | libmpv (software rendering) |
+| Windows  | libmpv (software rendering) |
+| Web      | HTML5 `<video>`             |
 
 ## Getting Started
 
@@ -97,14 +65,16 @@ localhost cleartext traffic.
 2. Reference it in `AndroidManifest.xml`:
 
 ```xml
+
 <application
-    android:networkSecurityConfig="@xml/network_security_config"
-    ...>
+        android:networkSecurityConfig="@xml/network_security_config"
+        ...>
 ```
 
 3. Ensure the INTERNET permission is present:
 
 ```xml
+
 <uses-permission android:name="android.permission.INTERNET"/>
 ```
 
@@ -113,10 +83,11 @@ localhost cleartext traffic.
 Add to `ios/Runner/Info.plist` if loading from HTTP sources:
 
 ```xml
+
 <key>NSAppTransportSecurity</key>
 <dict>
-  <key>NSAllowsLocalNetworking</key>
-  <true/>
+<key>NSAllowsLocalNetworking</key>
+<true/>
 </dict>
 ```
 
@@ -133,10 +104,11 @@ Add to `macos/Runner/Release.entitlements` and `DebugProfile.entitlements`:
 Add to `macos/Runner/Info.plist`:
 
 ```xml
+
 <key>NSAppTransportSecurity</key>
 <dict>
-  <key>NSAllowsLocalNetworking</key>
-  <true/>
+<key>NSAllowsLocalNetworking</key>
+<true/>
 </dict>
 ```
 
@@ -152,36 +124,6 @@ sudo dnf install mpv-libs-devel
 # Arch
 sudo pacman -S mpv
 ```
-
-#### Windows
-
-The Windows backend uses libmpv through software rendering. **You don't need
-to install anything manually** — the first `flutter run windows` /
-`flutter build windows` will auto-download a pinned prebuilt libmpv SDK
-(from [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake))
-into `windows/mpv-dev/` inside the plugin and cache it there. The archive is
-verified against a pinned SHA-256. `libmpv-2.dll` is bundled into the Flutter
-build output automatically.
-
-If you want to use a pre-extracted SDK (e.g. on offline machines or a
-different architecture), point CMake at it via one of:
-
-```bash
-# Preferred: directory containing include/mpv/*.h, libmpv.dll.a, libmpv-2.dll
-cmake -DMPV_DIR=C:/libs/mpv-dev ...
-# Or via environment variable
-set MPV_DIR=C:\libs\mpv-dev
-```
-
-To pin a different archive:
-
-```bash
-cmake -DMPV_DOWNLOAD_URL=https://example.com/mpv-dev.7z \
-      -DMPV_DOWNLOAD_SHA256=<sha256> ...
-```
-
-Extraction uses CMake's built-in `cmake -E tar` (libarchive), which supports
-7z out of the box.
 
 ## Configuration Reference
 
@@ -200,7 +142,7 @@ Extraction uses CMake's built-in `cmake -E tar` (libarchive), which supports
 
 ## How It Works
 
-1. **Request** — When `open(url)` is called, the proxy server starts serving the media URL from
+1. **Request** — When `playXXX(url)` is called, the proxy server starts serving the media URL from
    `http://127.0.0.1:{port}`
 2. **Download** — The download manager creates a chunk queue and dispatches tasks to the Isolate worker pool based on
    priority
@@ -212,47 +154,15 @@ Extraction uses CMake's built-in `cmake -E tar` (libarchive), which supports
 ## Widgets
 
 The plugin ships with two composable widgets. Pair either of them with a
-`FlutterCacheVideoPlayerController` that you create, `initialize()` once, and
+`VideoPlayerController` that you create, `initialize()` once, and
 `dispose()` when done.
 
-### `FlutterCacheVideoPlayerView` — bare video surface
+### `CorePlayer` — bare video surface
 
 Renders only the native video frame (via `Texture` on native platforms and
 `HtmlElementView` on web) plus a minimal loading / buffering / error state.
 Controls, progress bars, gestures and overlays are 100% your responsibility —
 use this when you want a fully custom UI.
-
-```dart
-final controller = FlutterCacheVideoPlayerController();
-
-@override
-void initState() {
-  super.initState();
-  () async {
-    await controller.initialize();
-    await controller.open('https://example.com/video.mp4');
-    await controller.play();
-  }();
-}
-
-@override
-Widget build(BuildContext context) {
-  return FlutterCacheVideoPlayerView(
-    controller: controller,
-    aspectRatio: 16 / 9,
-    backgroundColor: Colors.black,
-    // Optional custom states.
-    loadingBuilder: (ctx) => const CircularProgressIndicator(),
-    errorBuilder: (ctx, msg) => Text(msg ?? 'Playback error'),
-  );
-}
-
-@override
-void dispose() {
-  controller.dispose();
-  super.dispose();
-}
-```
 
 **Notes**
 
@@ -267,7 +177,7 @@ void dispose() {
 - When `playState` is `PlayState.error` the frame is hidden entirely; render
   a retry affordance inside `errorBuilder` so users can recover.
 
-### `DefaultVideoPlayer` — polished drop-in UI
+### `VideoPlayer` — polished drop-in UI
 
 An iOS-style, ready-to-use player built on top of `FlutterCacheVideoPlayerView`.
 It renders the video frame plus an overlay with a top bar (close + more),
@@ -278,54 +188,23 @@ the frame fades the overlay in/out; it auto-hides during playback.
 Cached progress is supplied **by the plugin itself** (driven by the download
 bitmap in the cache repository) — you do not need to feed it manually.
 
-```dart
-final controller = FlutterCacheVideoPlayerController();
-
-@override
-void initState() {
-  super.initState();
-  () async {
-    await controller.initialize();
-    await controller.open('https://example.com/video.mp4');
-    await controller.play();
-  }();
-}
-
-@override
-Widget build(BuildContext context) {
-  return DefaultVideoPlayer(
-    controller: controller,
-    aspectRatio: 16 / 9,
-    skipDuration: const Duration(seconds: 10),
-    autoHideDelay: const Duration(seconds: 3),
-    // Optional: customise look & feel.
-    style: const DefaultVideoPlayerStyle(
-      scrimIntensity: 0.55,
-      enableGlassmorphism: false,
-    ),
-    onClose: () => Navigator.of(context).maybePop(),
-    onMore: _showMoreSheet,
-  );
-}
-```
-
 **Key parameters**
 
-| Parameter          | Default                   | Description                                                                                               |
-|--------------------|---------------------------|-----------------------------------------------------------------------------------------------------------|
-| `controller`       | —                         | Required `FlutterCacheVideoPlayerController`. Must be `initialize()`-d before playback starts.            |
-| `aspectRatio`      | `16 / 9`                  | Used when `fill` is `false`.                                                                              |
-| `fill`             | `false`                   | When `true` the player fills the parent constraints instead of respecting `aspectRatio` (use for fullscreen). |
-| `skipDuration`     | `Duration(seconds: 10)`   | Controls the ±skip buttons. Matching SF Symbols are auto-picked for 10/15/30/45/60/75/90 s.              |
-| `autoHideDelay`    | `Duration(seconds: 3)`    | Time before the overlay fades while playing. `Duration.zero` disables auto-hide.                          |
-| `fadeDuration`     | `240 ms`                  | Overlay fade animation.                                                                                   |
-| `bufferedProgress` | `null`                    | Optional override; by default the plugin's `controller.bufferedProgress` drives the buffered segment.     |
-| `style`            | `DefaultVideoPlayerStyle()` | Colors, sizes, paddings, scrim, glass, scrubber colors/heights, time label text style.                  |
-| `onClose` / `onMore` | `null` / `null`         | Top-bar callbacks. `onClose` falls back to `Navigator.maybePop`.                                          |
-| `topBarActions`    | `[]`                      | Extra actions injected before the "more" button (PiP, cast, etc.).                                        |
-| `errorBuilder` / `loadingBuilder` | `null`     | Forwarded to the underlying `FlutterCacheVideoPlayerView`.                                                |
-| `topBarBuilder` / `centerControlsBuilder` / `bottomScrubberBuilder` | `null` | Fully replace any slot with your own widget while still receiving a `DefaultVideoPlayerSlotContext`. |
-| `extraOverlayBuilder` | `null`                 | Adds an extra layer above the controls (subtitles, danmu, watermark, …).                                  |
+| Parameter                                                           | Default                 | Description                                                                                                   |
+|---------------------------------------------------------------------|-------------------------|---------------------------------------------------------------------------------------------------------------|
+| `controller`                                                        | —                       | Required `VideoPlayerController`. Must be `initialize()`-d before playback starts.                            |
+| `aspectRatio`                                                       | `16 / 9`                | Used when `fill` is `false`.                                                                                  |
+| `fill`                                                              | `false`                 | When `true` the player fills the parent constraints instead of respecting `aspectRatio` (use for fullscreen). |
+| `skipDuration`                                                      | `Duration(seconds: 10)` | Controls the ±skip buttons. Matching SF Symbols are auto-picked for 10/15/30/45/60/75/90 s.                   |
+| `autoHideDelay`                                                     | `Duration(seconds: 3)`  | Time before the overlay fades while playing. `Duration.zero` disables auto-hide.                              |
+| `fadeDuration`                                                      | `240 ms`                | Overlay fade animation.                                                                                       |
+| `bufferedProgress`                                                  | `null`                  | Optional override; by default the plugin's `controller.bufferedProgress` drives the buffered segment.         |
+| `style`                                                             | `VideoPlayerStyle()`    | Colors, sizes, paddings, scrim, glass, scrubber colors/heights, time label text style.                        |
+| `onClose` / `onMore`                                                | `null` / `null`         | Top-bar callbacks. `onClose` falls back to `Navigator.maybePop`.                                              |
+| `topBarActions`                                                     | `[]`                    | Extra actions injected before the "more" button (PiP, cast, etc.).                                            |
+| `errorBuilder` / `loadingBuilder`                                   | `null`                  | Forwarded to the underlying `CorePlayer`.                                                                     |
+| `topBarBuilder` / `centerControlsBuilder` / `bottomScrubberBuilder` | `null`                  | Fully replace any slot with your own widget while still receiving a `VideoPlayerSlotContext`.                 |
+| `extraOverlayBuilder`                                               | `null`                  | Adds an extra layer above the controls (subtitles, danmu, watermark, …).                                      |
 
 **Notes**
 
@@ -353,7 +232,11 @@ assets are handed directly to the native player.
 
 ```dart
 // 1) Network — cached through the built-in HTTP proxy.
-await controller.playNetwork('https://example.com/video.mp4');
+await
+controller.playNetwork
+('https://example.com/video.mp4
+'
+);
 
 // 2) Local file — absolute path or file:// URI. No proxy, no caching.
 await controller.playFile('/absolute/path/to/movie.mp4');
@@ -362,10 +245,10 @@ await controller.playFile('/absolute/path/to/movie.mp4');
 await controller.playAsset('assets/videos/intro.mp4');
 
 // 4) Generic — use when you already have a VideoSource.
-await controller.playSource(VideoSource.network('https://...'));
+await controller.playSource(VideoSource.network('https://...'
+)
+);
 ```
-
-Legacy `controller.open(url)` is kept and is equivalent to `playNetwork(url)`.
 
 When using `playAsset`, declare the asset under your app's `pubspec.yaml`:
 
@@ -384,7 +267,10 @@ as an [`XFile`]. On native platforms the `XFile.path` points to a file on
 disk; on web it is a `blob:` / `data:` URL.
 
 ```dart
-final XFile png = await controller.takeSnapshot();
+
+final XFile png = await
+controller.takeSnapshot
+();
 // native: File(png.path)
 // web   : Image.network(png.path)
 ```
@@ -398,14 +284,17 @@ downsampled buffer, drops frames dimmer than `minBrightness`, and returns the
 top `count` frames sorted by brightness **descending**.
 
 ```dart
-final frames = await FlutterCacheVideoPlayer.extractCoverCandidates(
-  VideoSource.network('https://example.com/video.mp4'),
-  count: 5,          // up to 5 results
-  minBrightness: 0.08,
+
+final frames = await
+FlutterCacheVideoPlayer.instance.extractCoverCandidates
+(
+VideoSource.network('https://example.com/video.mp4'),
+count: 5, // up to 5 results
+minBrightness: 0.08,
 );
 
 for (final f in frames) {
-  print('${f.position} → ${f.image.path} (brightness=${f.brightness})');
+print('${f.position} → ${f.image.path} (brightness=${f.brightness})');
 }
 ```
 
@@ -413,14 +302,14 @@ Works with any `VideoSource` (`network`, `file`, `asset`).
 
 ### Platform support for snapshot / covers
 
-| Platform | `takeSnapshot` | `extractCoverCandidates` |
-|----------|:--------------:|:------------------------:|
-| iOS      | ✅ AVPlayerItemVideoOutput + Core Image | ✅ AVAssetImageGenerator |
-| Android  | ✅ MediaMetadataRetriever | ✅ MediaMetadataRetriever |
-| macOS    | ✅ AVPlayerItemVideoOutput + Core Image | ✅ AVAssetImageGenerator |
-| Web      | ✅ `<canvas>.toDataURL` | ✅ offscreen `<video>` + `<canvas>` (CORS required) |
-| Windows  | ✅ PNG bytes via libmpv `screenshot-to-file` | ✅ libmpv-based extraction |
-| Linux    | ✅ PNG bytes via libmpv `screenshot-to-file` | ✅ libmpv-based extraction |
+| Platform |               `takeSnapshot`                |              `extractCoverCandidates`              |
+|----------|:-------------------------------------------:|:--------------------------------------------------:|
+| iOS      |   ✅ AVPlayerItemVideoOutput + Core Image    |              ✅ AVAssetImageGenerator               |
+| Android  |          ✅ MediaMetadataRetriever           |              ✅ MediaMetadataRetriever              |
+| macOS    |   ✅ AVPlayerItemVideoOutput + Core Image    |              ✅ AVAssetImageGenerator               |
+| Web      |           ✅ `<canvas>.toDataURL`            | ✅ offscreen `<video>` + `<canvas>` (CORS required) |
+| Windows  | ✅ PNG bytes via libmpv `screenshot-to-file` |             ✅ libmpv-based extraction              |
+| Linux    | ✅ PNG bytes via libmpv `screenshot-to-file` |             ✅ libmpv-based extraction              |
 
 On Web, cover extraction requires the video server to send CORS headers
 allowing `crossOrigin="anonymous"` — otherwise the canvas is tainted and the
@@ -436,12 +325,15 @@ durations in lists / thumbnails / previews, or to pre-validate a URL before
 opening it in a full player.
 
 ```dart
-final duration = await FlutterCacheVideoPlayer.instance.getDuration(
-  VideoSource.network('https://example.com/video.mp4'),
-  timeout: const Duration(seconds: 10),
+
+final duration = await
+FlutterCacheVideoPlayer.instance.getDuration
+(
+VideoSource.network('https://example.com/video.mp4'),
+timeout: const Duration(seconds: 10),
 );
 if (duration != null) {
-  debugPrint('Total duration: ${duration.inMilliseconds} ms');
+debugPrint('Total duration: ${duration.inMilliseconds} ms');
 }
 ```
 
@@ -450,31 +342,36 @@ Works with any `VideoSource`:
 ```dart
 // Network — piped through the caching proxy; bytes read while probing
 // are reused by subsequent playNetwork(sameUrl) calls.
-await FlutterCacheVideoPlayer.instance.getDuration(
-  VideoSource.network('https://example.com/video.mp4'),
+await
+FlutterCacheVideoPlayer.instance.getDuration
+(
+VideoSource.network('https://example.com/video.mp4'),
 );
 
 // Local file — absolute path or file:// URI.
 await FlutterCacheVideoPlayer.instance.getDuration(
-  VideoSource.file('/absolute/path/to/movie.mp4'),
+VideoSource.file('/absolute/path/to/movie.mp4'),
 );
 
 // Flutter asset — extracted to the temp directory on first use.
 await FlutterCacheVideoPlayer.instance.getDuration(
-  VideoSource.asset('assets/videos/intro.mp4'),
+VideoSource.asset('assets/videos/intro.mp4
+'
+)
+,
 );
 ```
 
 ### Platform support for duration
 
-| Platform | Backend                                                    |
-|----------|------------------------------------------------------------|
-| iOS      | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`|
-| macOS    | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`|
-| Android  | `MediaMetadataRetriever` (`METADATA_KEY_DURATION`)         |
+| Platform | Backend                                                                         |
+|----------|---------------------------------------------------------------------------------|
+| iOS      | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`                     |
+| macOS    | `AVURLAsset.loadValuesAsynchronously(forKeys:["duration"])`                     |
+| Android  | `MediaMetadataRetriever` (`METADATA_KEY_DURATION`)                              |
 | Linux    | libmpv short-lived probe (same tail-moov-safe demuxer flags as the main player) |
 | Windows  | libmpv short-lived probe (same tail-moov-safe demuxer flags as the main player) |
-| Web      | Offscreen `<video preload="metadata">` + `loadedmetadata`  |
+| Web      | Offscreen `<video preload="metadata">` + `loadedmetadata`                       |
 
 **Notes**
 

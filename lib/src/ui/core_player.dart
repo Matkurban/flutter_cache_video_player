@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 import '../data/enums/play_state.dart';
-import '../player/flutter_cache_video_player_controller.dart';
+import '../player/video_player_controller.dart';
 
 /// 视频渲染组件，只负责显示视频画面和基本状态（加载/缓冲/错误）。
 /// 控制栏、进度条等由使用者自行实现。
@@ -10,9 +10,9 @@ import '../player/flutter_cache_video_player_controller.dart';
 /// Video rendering widget that only renders video frames and basic states
 /// (loading/buffering/error). Controls, progress bars, etc. are the
 /// caller's responsibility.
-class FlutterCacheVideoPlayerView extends StatelessWidget {
+class CorePlayer extends StatelessWidget {
   /// 播放控制器实例。
-  final FlutterCacheVideoPlayerController controller;
+  final VideoPlayerController controller;
 
   /// 视频宽高比。
   ///
@@ -39,7 +39,7 @@ class FlutterCacheVideoPlayerView extends StatelessWidget {
   /// 自定义加载/缓冲视图构建器。若为 null 则使用默认 CircularProgressIndicator。
   final Widget Function(BuildContext context)? loadingBuilder;
 
-  const FlutterCacheVideoPlayerView({
+  const CorePlayer({
     super.key,
     required this.controller,
     this.aspectRatio,

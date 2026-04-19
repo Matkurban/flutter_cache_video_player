@@ -12,8 +12,19 @@ Future<void> main() async {
   runApp(const ExampleApp());
 }
 
-class ExampleApp extends StatelessWidget {
+class ExampleApp extends StatefulWidget {
   const ExampleApp({super.key});
+
+  @override
+  State<ExampleApp> createState() => _ExampleAppState();
+}
+
+class _ExampleAppState extends State<ExampleApp> {
+  @override
+  void initState() {
+    super.initState();
+    FlutterCacheVideoPlayer.instance.initialize();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +36,12 @@ class ExampleApp extends StatelessWidget {
       darkTheme: ThemeData.dark(useMaterial3: true),
       home: const HomePage(),
     );
+  }
+
+  @override
+  void dispose() {
+    FlutterCacheVideoPlayer.instance.dispose();
+    super.dispose();
   }
 }
 
@@ -94,8 +111,8 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
-  final FlutterCacheVideoPlayerController _controller =
-      FlutterCacheVideoPlayerController();
+  final VideoPlayerController _controller =
+      VideoPlayerController();
   late int _index = widget.initialIndex;
   bool _ready = false;
   bool _fullscreen = false;
@@ -239,10 +256,8 @@ class _PlayerPageState extends State<PlayerPage> {
       const SnackBar(content: Text('Extracting covers...')),
     );
     try {
-      final frames = await FlutterCacheVideoPlayer.extractCoverCandidates(
-        VideoSource.network(item.url),
-        count: 5,
-      );
+      final frames = await FlutterCacheVideoPlayer.instance
+          .extractCoverCandidates(VideoSource.network(item.url), count: 5);
       if (!mounted) return;
       messenger.hideCurrentSnackBar();
       if (frames.isEmpty) {
@@ -276,7 +291,7 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
             ),
           )
-        : DefaultVideoPlayer(
+        : VideoPlayer(
             controller: _controller,
             fill: _fullscreen,
             onClose: () {
@@ -344,7 +359,7 @@ class _PlayerPageState extends State<PlayerPage> {
 }
 
 class _PlayerStateBar extends StatelessWidget {
-  final FlutterCacheVideoPlayerController controller;
+  final VideoPlayerController controller;
   const _PlayerStateBar({required this.controller});
 
   @override
@@ -396,7 +411,7 @@ class _Chip extends StatelessWidget {
 }
 
 class _SpeedRow extends StatelessWidget {
-  final FlutterCacheVideoPlayerController controller;
+  final VideoPlayerController controller;
   const _SpeedRow({required this.controller});
 
   static const List<double> _speeds = <double>[0.5, 1.0, 1.25, 1.5, 2.0];

@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_cache_video_player/src/data/tables.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cross_file/cross_file.dart';
-import 'package:tostore/tostore.dart';
 import 'core/constants.dart';
 import 'core/platform_detector.dart';
 import 'core/video_source.dart';
@@ -43,16 +41,19 @@ class FlutterCacheVideoPlayer {
 
   late final HistoryRepository _historyRepo;
 
+  @internal
   HistoryRepository get historyRepo => _historyRepo;
 
   late final DownloadManager _downloadManager;
 
+  @internal
   DownloadManager get downloadManager => _downloadManager;
 
   ProxyCacheServer? _proxyServer;
 
   late final PlatformPlayerFactory _playerFactory;
 
+  @internal
   PlatformPlayerFactory get playerFactory => _playerFactory;
 
   bool _initialized = false;
@@ -69,24 +70,16 @@ class FlutterCacheVideoPlayer {
 
   /// 初始化所有服务层：数据库 → 下载线程池 → 代理服务器 → 播放器。
   /// Initializes all service layers: DB → worker pool → proxy server → player.
-  Future<void> initialize({ToStore? tostore}) async {
+  Future<void> initialize() async {
     WidgetsFlutterBinding.ensureInitialized();
     // Initialize database
     _cacheDB = CacheIndexDB.instance;
-
     final dbPath = PlatformDetector.isWeb ? '' : await FileUtils.getCacheDirectory();
-    await _cacheDB.initDatabase(dbPath: dbPath, tostore: tostore);
-
+    await _cacheDB.initDatabase(dbPath: dbPath);
     _cacheRepo = CacheRepository(_cacheDB, config);
-
     _historyRepo = HistoryRepository(_cacheDB);
-
-    // Initialize download manager (no-op on Web)
     _downloadManager = DownloadManager(config: config, cacheRepo: _cacheRepo);
-
     await _downloadManager.init();
-
-    // Start proxy server (Native only)
     if (PlatformDetector.isNative) {
       _proxyServer = ProxyCacheServer(
         config: config,
@@ -95,13 +88,11 @@ class FlutterCacheVideoPlayer {
       );
       await _proxyServer!.start();
     }
-
-    // Player
     _playerFactory = PlatformPlayerFactory(proxyServer: _proxyServer);
     _initialized = true;
   }
 
-  static List<TableSchema> get tableSchemas => Tables.allTables;
+  static const MethodChannel _playerChannel = MethodChannel('flutter_cache_video_player/player');
 
   /// 从任意来源的视频中抽取若干非黑的封面候选帧。
   ///
@@ -116,9 +107,7 @@ class FlutterCacheVideoPlayer {
   /// Extract a handful of non-black cover candidates from any [VideoSource].
   /// Results are sorted by brightness descending. Asset sources are extracted
   /// to a temp file before decoding. Returns an empty list on failure.
-  static const MethodChannel _playerChannel = MethodChannel('flutter_cache_video_player/player');
-
-  static Future<List<VideoCoverFrame>> extractCoverCandidates(
+  Future<List<VideoCoverFrame>> extractCoverCandidates(
     VideoSource source, {
     int count = 5,
     double minBrightness = 0.08,

@@ -9,7 +9,7 @@ import 'native_player_controller.dart';
 
 /// 播放控制器，封装 NativePlayerController 并管理生命周期、事件监听和历史持久化。
 /// Player controller wrapping NativePlayerController with lifecycle management, event listeners, and history persistence.
-class FlutterCacheVideoPlayerController {
+class VideoPlayerController {
   late final NativePlayerController _nativeController;
 
   final List<VoidCallback> _disposers = <VoidCallback>[];
@@ -85,7 +85,7 @@ class FlutterCacheVideoPlayerController {
     return position.value.inMilliseconds / duration.value.inMilliseconds;
   });
 
-  FlutterCacheVideoPlayerController() {
+  VideoPlayerController() {
     _nativeController = NativePlayerController();
   }
 

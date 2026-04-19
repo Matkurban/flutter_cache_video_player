@@ -4,25 +4,25 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_video_player/src/ui/core_player.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
 import '../data/enums/play_state.dart';
-import '../player/flutter_cache_video_player_controller.dart';
-import 'flutter_cache_video_player_view.dart';
-import 'style/default_video_player_style.dart';
+import '../player/video_player_controller.dart';
+import 'style/video_player_style.dart';
 import 'widgets/player_gradient_mask.dart';
 import 'widgets/player_icon_button.dart';
 import 'widgets/player_scrubber_slider.dart';
 
 /// 传递给自定义槽位 builder 的上下文，提供控制器和当前样式。
 /// Context passed to slot builders so callers can reuse controller and style.
-class DefaultVideoPlayerSlotContext {
-  final FlutterCacheVideoPlayerController controller;
-  final DefaultVideoPlayerStyle style;
+class VideoPlayerSlotContext {
+  final VideoPlayerController controller;
+  final VideoPlayerStyle style;
   final VoidCallback showControls;
   final VoidCallback hideControls;
 
-  const DefaultVideoPlayerSlotContext({
+  const VideoPlayerSlotContext({
     required this.controller,
     required this.style,
     required this.showControls,
@@ -40,10 +40,10 @@ class DefaultVideoPlayerSlotContext {
 /// surface: a top bar with "done" + more, center transport controls, and a
 /// thin bottom scrubber with buffered progress. Tapping the frame fades the
 /// controls in/out and they auto-hide during playback.
-class DefaultVideoPlayer extends StatefulWidget {
+class VideoPlayer extends StatefulWidget {
   /// 底层播放控制器。
   /// The underlying player controller.
-  final FlutterCacheVideoPlayerController controller;
+  final VideoPlayerController controller;
 
   /// 视频宽高比。当 [fill] 为 true 时此属性被忽略，播放器会铺满外部约束。
   /// 为 null（默认）时，使用原生播放器上报的真实宽高比，避免竖向视频被拉伸。
@@ -72,18 +72,18 @@ class DefaultVideoPlayer extends StatefulWidget {
   final bool initiallyVisible;
 
   /// 外部提供的已缓存进度（0.0 – 1.0），用于覆盖默认的插件内置进度。
-  /// 不提供时，进度条会自动使用 [FlutterCacheVideoPlayerController.bufferedProgress]
+  /// 不提供时，进度条会自动使用 [VideoPlayerController.bufferedProgress]
   /// （由插件的缓存位图驱动）。
   ///
   /// Optional override for the cached-progress signal. When omitted the
   /// scrubber automatically reflects
-  /// [FlutterCacheVideoPlayerController.bufferedProgress], which the plugin
+  /// [VideoPlayerController.bufferedProgress], which the plugin
   /// drives from the download bitmap in its cache repository.
   final ValueListenable<double>? bufferedProgress;
 
   /// 视觉样式。
   /// Visual style bundle.
-  final DefaultVideoPlayerStyle style;
+  final VideoPlayerStyle style;
 
   /// 点击左上角"完成/收起"按钮。为 null 时尝试 `Navigator.maybePop`。
   /// Handler for the leading "done" button. Falls back to `Navigator.maybePop`.
@@ -107,21 +107,21 @@ class DefaultVideoPlayer extends StatefulWidget {
 
   /// 完全自定义顶部栏（返回的 widget 将取代默认顶部栏）。
   /// Override for the entire top bar.
-  final Widget Function(BuildContext, DefaultVideoPlayerSlotContext)? topBarBuilder;
+  final Widget Function(BuildContext, VideoPlayerSlotContext)? topBarBuilder;
 
   /// 完全自定义中央控制区。
   /// Override for the center transport controls.
-  final Widget Function(BuildContext, DefaultVideoPlayerSlotContext)? centerControlsBuilder;
+  final Widget Function(BuildContext, VideoPlayerSlotContext)? centerControlsBuilder;
 
   /// 完全自定义底部进度条行。
   /// Override for the bottom scrubber row.
-  final Widget Function(BuildContext, DefaultVideoPlayerSlotContext)? bottomScrubberBuilder;
+  final Widget Function(BuildContext, VideoPlayerSlotContext)? bottomScrubberBuilder;
 
   /// 在默认覆盖层之后再叠加的自定义图层（例如弹幕、字幕）。
   /// Extra overlay rendered above the default controls (e.g. subtitles).
-  final Widget Function(BuildContext, DefaultVideoPlayerSlotContext)? extraOverlayBuilder;
+  final Widget Function(BuildContext, VideoPlayerSlotContext)? extraOverlayBuilder;
 
-  const DefaultVideoPlayer({
+  const VideoPlayer({
     super.key,
     required this.controller,
     this.aspectRatio,
@@ -131,7 +131,7 @@ class DefaultVideoPlayer extends StatefulWidget {
     this.fadeDuration = const Duration(milliseconds: 240),
     this.initiallyVisible = true,
     this.bufferedProgress,
-    this.style = const DefaultVideoPlayerStyle(),
+    this.style = const VideoPlayerStyle(),
     this.onClose,
     this.onMore,
     this.topBarActions = const <Widget>[],
@@ -144,10 +144,10 @@ class DefaultVideoPlayer extends StatefulWidget {
   });
 
   @override
-  State<DefaultVideoPlayer> createState() => _DefaultVideoPlayerState();
+  State<VideoPlayer> createState() => _VideoPlayerState();
 }
 
-class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
+class _VideoPlayerState extends State<VideoPlayer> {
   late bool _visible = widget.initiallyVisible;
   Timer? _hideTimer;
   VoidCallback? _playingDisposer;
@@ -228,8 +228,8 @@ class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
     }
   }
 
-  DefaultVideoPlayerSlotContext _slotContext() {
-    return DefaultVideoPlayerSlotContext(
+  VideoPlayerSlotContext _slotContext() {
+    return VideoPlayerSlotContext(
       controller: widget.controller,
       style: widget.style,
       showControls: _showControls,
@@ -241,7 +241,7 @@ class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
   Widget build(BuildContext context) {
     final style = widget.style;
 
-    final videoView = FlutterCacheVideoPlayerView(
+    final videoView = CorePlayer(
       controller: widget.controller,
       aspectRatio: widget.aspectRatio,
       backgroundColor: style.backgroundColor,
@@ -360,7 +360,7 @@ class _DefaultVideoPlayerState extends State<DefaultVideoPlayer> {
 // ---------------------------------------------------------------------------
 
 class _DefaultTopBar extends StatelessWidget {
-  final DefaultVideoPlayerSlotContext slot;
+  final VideoPlayerSlotContext slot;
   final VoidCallback onClose;
   final VoidCallback? onMore;
   final List<Widget> actions;
@@ -407,7 +407,7 @@ class _DefaultTopBar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DefaultCenterControls extends StatelessWidget {
-  final DefaultVideoPlayerSlotContext slot;
+  final VideoPlayerSlotContext slot;
   final Duration skipDuration;
   final VoidCallback onInteract;
 
@@ -550,7 +550,7 @@ class _DefaultCenterControls extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DefaultBottomScrubber extends StatefulWidget {
-  final DefaultVideoPlayerSlotContext slot;
+  final VideoPlayerSlotContext slot;
   final ValueListenable<double>? bufferedProgress;
   final VoidCallback onInteractStart;
   final VoidCallback onInteractEnd;

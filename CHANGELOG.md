@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.1](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.6.0...v1.6.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* format code ([c6fa4e9](https://github.com/Matkurban/flutter_cache_video_player/commit/c6fa4e9dcbbfe9cd0331aec06321f9d64f67a7d5))
+* format windows and linux code ([16d992e](https://github.com/Matkurban/flutter_cache_video_player/commit/16d992eef71784ec099196c7c317c26dcbe75123))
+* format windows and linux code ([7c75794](https://github.com/Matkurban/flutter_cache_video_player/commit/7c757946afe3807bd41a177187c38bbe39cf7a40))
+* windows and linux bugs ([6dfeea5](https://github.com/Matkurban/flutter_cache_video_player/commit/6dfeea518ffb75466e0f3b3dee116bdd8f8b1a5f))
+
 ## [1.6.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.5.0...v1.6.0) (2026-04-19)
 
 

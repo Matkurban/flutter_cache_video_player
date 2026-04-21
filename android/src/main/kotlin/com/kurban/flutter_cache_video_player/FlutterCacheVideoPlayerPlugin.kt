@@ -223,8 +223,10 @@ class FlutterCacheVideoPlayerPlugin :
                         sendEvent("duration", player.duration)
                     }
                 }
+
                 Player.STATE_ENDED -> sendEvent("completed", null)
-                Player.STATE_IDLE -> { /* no-op */ }
+                Player.STATE_IDLE -> { /* no-op */
+                }
             }
         }
 
@@ -281,7 +283,10 @@ class FlutterCacheVideoPlayerPlugin :
                     result.error("SNAPSHOT_FAIL", t.message ?: "snapshot failed", null)
                 }
             } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+                try {
+                    retriever.release()
+                } catch (_: Throwable) {
+                }
             }
         }
     }
@@ -309,7 +314,10 @@ class FlutterCacheVideoPlayerPlugin :
             } catch (_: Throwable) {
                 mainHandler.post { result.success(null) }
             } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+                try {
+                    retriever.release()
+                } catch (_: Throwable) {
+                }
             }
         }
     }
@@ -378,7 +386,10 @@ class FlutterCacheVideoPlayerPlugin :
             } catch (t: Throwable) {
                 mainHandler.post { result.success(emptyList<Any>()) }
             } finally {
-                try { retriever.release() } catch (_: Throwable) {}
+                try {
+                    retriever.release()
+                } catch (_: Throwable) {
+                }
             }
         }
     }
@@ -396,6 +407,7 @@ class FlutterCacheVideoPlayerPlugin :
                 if (appContext != null) retriever.setDataSource(appContext, uri)
                 else retriever.setDataSource(url, HashMap())
             }
+
             else -> retriever.setDataSource(url)
         }
     }

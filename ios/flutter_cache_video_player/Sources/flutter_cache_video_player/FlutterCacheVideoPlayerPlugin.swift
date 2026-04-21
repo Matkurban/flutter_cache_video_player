@@ -1,6 +1,6 @@
+import AVFoundation
 import Flutter
 import UIKit
-import AVFoundation
 
 /// iOS 插件主类，基于 AVPlayer 实现原生视频播放，通过 FlutterTexture 渲染。
 /// iOS plugin main class implementing native video playback with AVPlayer, rendered via FlutterTexture.
@@ -26,13 +26,24 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
             binaryMessenger: registrar.messenger()
         )
         instance.eventChannel = eventChannel
-        instance.videoPlayer = NativeVideoPlayer(textureRegistry: registrar.textures())
+        instance.videoPlayer = NativeVideoPlayer(
+            textureRegistry: registrar.textures()
+        )
         eventChannel.setStreamHandler(instance.videoPlayer)
     }
 
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    public func handle(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
         guard let player = videoPlayer else {
-            result(FlutterError(code: "NO_PLAYER", message: "Player not initialized", details: nil))
+            result(
+                FlutterError(
+                    code: "NO_PLAYER",
+                    message: "Player not initialized",
+                    details: nil
+                )
+            )
             return
         }
 
@@ -42,8 +53,15 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
             result(textureId)
         case "open":
             guard let args = call.arguments as? [String: Any],
-                  let url = args["url"] as? String else {
-                result(FlutterError(code: "INVALID_ARG", message: "url is required", details: nil))
+                let url = args["url"] as? String
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "url is required",
+                        details: nil
+                    )
+                )
                 return
             }
             player.open(url: url)
@@ -56,24 +74,45 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
             result(nil)
         case "seek":
             guard let args = call.arguments as? [String: Any],
-                  let position = args["position"] as? Int else {
-                result(FlutterError(code: "INVALID_ARG", message: "position is required", details: nil))
+                let position = args["position"] as? Int
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "position is required",
+                        details: nil
+                    )
+                )
                 return
             }
             player.seek(positionMs: position)
             result(nil)
         case "setVolume":
             guard let args = call.arguments as? [String: Any],
-                  let volume = args["volume"] as? Double else {
-                result(FlutterError(code: "INVALID_ARG", message: "volume is required", details: nil))
+                let volume = args["volume"] as? Double
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "volume is required",
+                        details: nil
+                    )
+                )
                 return
             }
             player.setVolume(volume: Float(volume))
             result(nil)
         case "setSpeed":
             guard let args = call.arguments as? [String: Any],
-                  let speed = args["speed"] as? Double else {
-                result(FlutterError(code: "INVALID_ARG", message: "speed is required", details: nil))
+                let speed = args["speed"] as? Double
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "speed is required",
+                        details: nil
+                    )
+                )
                 return
             }
             player.setSpeed(speed: Float(speed))
@@ -85,14 +124,22 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
             player.takeSnapshot(result: result)
         case "extractCovers":
             guard let args = call.arguments as? [String: Any],
-                  let url = args["url"] as? String else {
-                result(FlutterError(code: "INVALID_ARG", message: "url is required", details: nil))
+                let url = args["url"] as? String
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "url is required",
+                        details: nil
+                    )
+                )
                 return
             }
             let count = (args["count"] as? Int) ?? 5
             let candidates = (args["candidates"] as? Int) ?? (count * 3)
             let minBrightness = (args["minBrightness"] as? Double) ?? 0.08
-            let outputDir = (args["outputDir"] as? String) ?? NSTemporaryDirectory()
+            let outputDir =
+                (args["outputDir"] as? String) ?? NSTemporaryDirectory()
             NativeVideoPlayer.extractCovers(
                 url: url,
                 count: count,
@@ -103,12 +150,23 @@ public class FlutterCacheVideoPlayerPlugin: NSObject, FlutterPlugin {
             )
         case "getDuration":
             guard let args = call.arguments as? [String: Any],
-                  let url = args["url"] as? String else {
-                result(FlutterError(code: "INVALID_ARG", message: "url is required", details: nil))
+                let url = args["url"] as? String
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARG",
+                        message: "url is required",
+                        details: nil
+                    )
+                )
                 return
             }
             let timeoutMs = (args["timeoutMs"] as? Int) ?? 15000
-            NativeVideoPlayer.getDuration(url: url, timeoutMs: timeoutMs, result: result)
+            NativeVideoPlayer.getDuration(
+                url: url,
+                timeoutMs: timeoutMs,
+                result: result
+            )
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
         default:
@@ -140,13 +198,16 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
     // MARK: - FlutterStreamHandler
 
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        self.eventSink = events
+    func onListen(
+        withArguments _: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        eventSink = events
         return nil
     }
 
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
+    func onCancel(withArguments _: Any?) -> FlutterError? {
+        eventSink = nil
         return nil
     }
 
@@ -184,13 +245,17 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
         // Setup video output for texture rendering
         let outputSettings: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            kCVPixelBufferPixelFormatTypeKey as String:
+                kCVPixelFormatType_32BGRA
         ]
-        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: outputSettings)
+        videoOutput = AVPlayerItemVideoOutput(
+            pixelBufferAttributes: outputSettings
+        )
         playerItem!.add(videoOutput!)
 
         // Observe status
-        statusObservation = playerItem!.observe(\.status, options: [.new]) { [weak self] item, _ in
+        statusObservation = playerItem!.observe(\.status, options: [.new]) {
+            [weak self] item, _ in
             guard let self = self else { return }
             switch item.status {
             case .readyToPlay:
@@ -198,7 +263,10 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
                 self.sendEvent(event: "duration", value: durationMs)
                 self.sendEvent(event: "buffering", value: false)
             case .failed:
-                self.sendEvent(event: "error", value: item.error?.localizedDescription ?? "Unknown error")
+                self.sendEvent(
+                    event: "error",
+                    value: item.error?.localizedDescription ?? "Unknown error"
+                )
             default:
                 break
             }
@@ -208,16 +276,24 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
         // Report the display-oriented video size so Flutter can pick the
         // correct aspect ratio (portrait videos are otherwise stretched).
         let reportSize: (CGSize) -> Void = { [weak self] size in
-            guard size.width > 0 && size.height > 0 else { return }
-            self?.sendEvent(event: "videoSize", value: [
-                "width": Int(size.width),
-                "height": Int(size.height),
-            ])
+            guard size.width > 0, size.height > 0 else { return }
+            self?.sendEvent(
+                event: "videoSize",
+                value: [
+                    "width": Int(size.width),
+                    "height": Int(size.height),
+                ]
+            )
         }
-        if playerItem!.presentationSize.width > 0 && playerItem!.presentationSize.height > 0 {
+        if playerItem!.presentationSize.width > 0,
+            playerItem!.presentationSize.height > 0
+        {
             reportSize(playerItem!.presentationSize)
         }
-        presentationSizeObservation = playerItem!.observe(\.presentationSize, options: [.new, .initial]) { item, _ in
+        presentationSizeObservation = playerItem!.observe(
+            \.presentationSize,
+            options: [.new, .initial]
+        ) { item, _ in
             reportSize(item.presentationSize)
         }
 
@@ -226,7 +302,10 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
         // Position observer (every 200ms)
         let interval = CMTime(value: 1, timescale: 5)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+        timeObserver = player?.addPeriodicTimeObserver(
+            forInterval: interval,
+            queue: .main
+        ) { [weak self] time in
             let ms = Int(CMTimeGetSeconds(time) * 1000)
             self?.sendEvent(event: "position", value: ms)
         }
@@ -319,7 +398,10 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
     private func startDisplayLink() {
         stopDisplayLink()
-        displayLink = CADisplayLink(target: self, selector: #selector(onDisplayLink))
+        displayLink = CADisplayLink(
+            target: self,
+            selector: #selector(onDisplayLink)
+        )
         displayLink?.add(to: .main, forMode: .common)
     }
 
@@ -332,7 +414,10 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
         guard let output = videoOutput else { return }
         let currentTime = output.itemTime(forHostTime: CACurrentMediaTime())
         if output.hasNewPixelBuffer(forItemTime: currentTime) {
-            latestPixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil)
+            latestPixelBuffer = output.copyPixelBuffer(
+                forItemTime: currentTime,
+                itemTimeForDisplay: nil
+            )
             textureRegistry.textureFrameAvailable(textureId)
         }
     }
@@ -349,13 +434,25 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     /// Snapshot the current frame and return PNG Data via the result callback.
     func takeSnapshot(result: @escaping FlutterResult) {
         guard let buffer = latestPixelBuffer else {
-            result(FlutterError(code: "NO_FRAME", message: "No frame available", details: nil))
+            result(
+                FlutterError(
+                    code: "NO_FRAME",
+                    message: "No frame available",
+                    details: nil
+                )
+            )
             return
         }
         if let data = Self.pngData(from: buffer) {
             result(FlutterStandardTypedData(bytes: data))
         } else {
-            result(FlutterError(code: "ENCODE_FAIL", message: "Failed to encode PNG", details: nil))
+            result(
+                FlutterError(
+                    code: "ENCODE_FAIL",
+                    message: "Failed to encode PNG",
+                    details: nil
+                )
+            )
         }
     }
 
@@ -382,12 +479,22 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
             }
 
             let fm = FileManager.default
-            try? fm.createDirectory(atPath: outputDir, withIntermediateDirectories: true, attributes: nil)
+            try? fm.createDirectory(
+                atPath: outputDir,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
 
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            generator.requestedTimeToleranceBefore = CMTime(seconds: 0.5, preferredTimescale: 600)
-            generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+            generator.requestedTimeToleranceBefore = CMTime(
+                seconds: 0.5,
+                preferredTimescale: 600
+            )
+            generator.requestedTimeToleranceAfter = CMTime(
+                seconds: 0.5,
+                preferredTimescale: 600
+            )
             generator.maximumSize = CGSize(width: 1280, height: 720)
 
             // Sample times: skip first/last 5%, evenly distribute `candidates` in between.
@@ -398,22 +505,34 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
             var times: [NSValue] = []
             for i in 0..<n {
                 let t = lower + span * (Double(i) + 0.5) / Double(n)
-                times.append(NSValue(time: CMTime(seconds: t, preferredTimescale: 600)))
+                times.append(
+                    NSValue(time: CMTime(seconds: t, preferredTimescale: 600))
+                )
             }
 
             var frames: [[String: Any]] = []
             let group = DispatchGroup()
             let sync = DispatchQueue(label: "flutter_cache_video_player.covers")
-            for value in times { _ = value; group.enter() }
+            for value in times {
+                _ = value
+                group.enter()
+            }
 
-            generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, cgImage, _, status, _ in
+            generator.generateCGImagesAsynchronously(forTimes: times) {
+                requestedTime,
+                cgImage,
+                _,
+                status,
+                _ in
                 defer { group.leave() }
                 guard status == .succeeded, let cg = cgImage else { return }
                 let brightness = Self.averageBrightness(cgImage: cg)
                 if brightness < minBrightness { return }
                 let ms = Int(CMTimeGetSeconds(requestedTime) * 1000)
                 let name = "cover-\(abs(url.hashValue))-\(ms).png"
-                let outPath = (outputDir as NSString).appendingPathComponent(name)
+                let outPath = (outputDir as NSString).appendingPathComponent(
+                    name
+                )
                 if Self.writePNG(cgImage: cg, to: outPath) {
                     sync.sync {
                         frames.append([
@@ -427,7 +546,7 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
             group.notify(queue: .main) {
                 // Sort by brightness descending and trim to count.
-                let sorted = frames.sorted { (a, b) -> Bool in
+                let sorted = frames.sorted { a, b -> Bool in
                     let ab = (a["brightness"] as? Double) ?? 0
                     let bb = (b["brightness"] as? Double) ?? 0
                     return ab > bb
@@ -458,7 +577,9 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
                 finished = true
                 semaphore.signal()
             }
-            let waitResult = semaphore.wait(timeout: .now() + .milliseconds(timeoutMs))
+            let waitResult = semaphore.wait(
+                timeout: .now() + .milliseconds(timeoutMs)
+            )
             guard waitResult == .success, finished else {
                 DispatchQueue.main.async { result(nil) }
                 return
@@ -484,20 +605,24 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     private static func pngData(from buffer: CVPixelBuffer) -> Data? {
         let ci = CIImage(cvPixelBuffer: buffer)
         let ctx = CIContext(options: nil)
-        guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return nil }
+        guard let cg = ctx.createCGImage(ci, from: ci.extent) else {
+            return nil
+        }
         #if os(iOS) || os(tvOS) || os(visionOS)
-        return UIImage(cgImage: cg).pngData()
+            return UIImage(cgImage: cg).pngData()
         #else
-        return nil
+            return nil
         #endif
     }
 
     private static func writePNG(cgImage: CGImage, to path: String) -> Bool {
         #if os(iOS) || os(tvOS) || os(visionOS)
-        guard let data = UIImage(cgImage: cgImage).pngData() else { return false }
-        return (try? data.write(to: URL(fileURLWithPath: path))) != nil
+            guard let data = UIImage(cgImage: cgImage).pngData() else {
+                return false
+            }
+            return (try? data.write(to: URL(fileURLWithPath: path))) != nil
         #else
-        return false
+            return false
         #endif
     }
 
@@ -508,15 +633,17 @@ class NativeVideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
         var data = [UInt8](repeating: 0, count: w * h * 4)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
-        guard let ctx = CGContext(
-            data: &data,
-            width: w,
-            height: h,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else { return 0 }
+        guard
+            let ctx = CGContext(
+                data: &data,
+                width: w,
+                height: h,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo
+            )
+        else { return 0 }
         ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
         var total: Double = 0
         let pixelCount = w * h

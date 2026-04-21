@@ -1,1 +1,1 @@
-rootProject.name = 'flutter_cache_video_player'
+rootProject.name = "flutter_cache_video_player"

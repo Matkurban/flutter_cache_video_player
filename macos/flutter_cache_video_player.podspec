@@ -4,14 +4,14 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_cache_video_player'
-  s.version          = '0.0.1'
-  s.summary          = 'A new Flutter project.'
+  s.version          = '1.6.0'
+  s.summary          = 'flutter_cache_video_player'
   s.description      = <<-DESC
-A new Flutter project.
+A six-terminal universal audio and video player that caches while watching, supports multi-threaded download, breakpoint resumption, and LRU cache elimination.
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://jsontodart.cn'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'Matkurban' => '3496354336@qq.com' }
 
   s.source           = { :path => '.' }
   s.source_files = 'flutter_cache_video_player/Sources/flutter_cache_video_player/**/*'

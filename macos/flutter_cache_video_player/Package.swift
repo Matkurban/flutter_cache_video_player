@@ -6,10 +6,10 @@ import PackageDescription
 let package = Package(
     name: "flutter_cache_video_player",
     platforms: [
-        .macOS("10.15")
+        .macOS("10.15"),
     ],
     products: [
-        .library(name: "flutter-cache-video-player", targets: ["flutter_cache_video_player"])
+        .library(name: "flutter-cache-video-player", targets: ["flutter_cache_video_player"]),
     ],
     dependencies: [],
     targets: [
@@ -27,6 +27,6 @@ let package = Package(
                 // the following instructions to add them:
                 // https://developer.apple.com/documentation/xcode/bundling-resources-with-a-swift-package
             ]
-        )
+        ),
     ]
 )

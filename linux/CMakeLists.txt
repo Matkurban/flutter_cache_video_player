@@ -14,7 +14,8 @@ set(PLUGIN_NAME "flutter_cache_video_player_plugin")
 # Any new source files that you add to the plugin should be added here.
 list(APPEND PLUGIN_SOURCES
   "flutter_cache_video_player_plugin.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native/mpv_player.cc"
+  "mpv_player.cc"
+  "mpv_player.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -43,7 +44,7 @@ pkg_check_modules(MPV REQUIRED mpv)
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(${PLUGIN_NAME} PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native"
+  "${CMAKE_CURRENT_SOURCE_DIR}"
   ${MPV_INCLUDE_DIRS})
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
@@ -97,7 +98,6 @@ add_executable(${TEST_RUNNER}
 apply_standard_settings(${TEST_RUNNER})
 target_include_directories(${TEST_RUNNER} PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native"
   ${MPV_INCLUDE_DIRS})
 target_link_libraries(${TEST_RUNNER} PRIVATE flutter)
 target_link_libraries(${TEST_RUNNER} PRIVATE PkgConfig::GTK)

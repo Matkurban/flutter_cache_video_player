@@ -20,8 +20,8 @@ set(PLUGIN_NAME "flutter_cache_video_player_plugin")
 list(APPEND PLUGIN_SOURCES
   "flutter_cache_video_player_plugin.cpp"
   "flutter_cache_video_player_plugin.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native/mpv_player.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native/mpv_player.h"
+  "mpv_player.cc"
+  "mpv_player.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -165,7 +165,7 @@ find_file(MPV_RUNTIME_DLL
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(${PLUGIN_NAME} PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native"
+  "${CMAKE_CURRENT_SOURCE_DIR}"
   "${MPV_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
   "${MPV_LIBRARY}")
@@ -224,7 +224,6 @@ target_compile_options(${TEST_RUNNER} PRIVATE /utf-8)
 target_compile_definitions(${TEST_RUNNER} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_include_directories(${TEST_RUNNER} PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../native"
   "${MPV_DIR}/include")
 target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin
   "${MPV_LIBRARY}")

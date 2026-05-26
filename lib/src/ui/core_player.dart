@@ -10,7 +10,7 @@ import '../player/video_player_controller.dart';
 /// Video rendering widget that only renders video frames and basic states
 /// (loading/buffering/error). Controls, progress bars, etc. are the
 /// caller's responsibility.
-class CorePlayer extends StatelessWidget {
+class CorePlayer extends SignalWidget {
   /// 播放控制器实例。
   final VideoPlayerController controller;
 
@@ -50,8 +50,8 @@ class CorePlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PlayState state = controller.playState.watch(context);
-    final buffering = controller.isBuffering.watch(context);
+    final FlutterSignal<PlayState> state = controller.playState;
+    final buffering = controller.isBuffering;
 
     // Resolve the aspect ratio to use for this build:
     //  * explicit `aspectRatio` param always wins
@@ -61,17 +61,17 @@ class CorePlayer extends StatelessWidget {
     if (aspectRatio != null) {
       effectiveAspectRatio = aspectRatio!;
     } else {
-      final reported = controller.videoAspectRatio.watch(context);
-      effectiveAspectRatio = (reported != null && reported > 0) ? reported : 16 / 9;
+      final reported = controller.videoAspectRatio;
+      effectiveAspectRatio = ((reported.value > 0) ? reported.value : 16 / 9);
     }
 
     // Error
-    if (state == PlayState.error) {
-      final err = controller.errorMessage.watch(context);
+    if (state.value == PlayState.error) {
+      final err = controller.errorMessage;
       return Container(
         color: backgroundColor,
         alignment: Alignment.center,
-        child: errorBuilder != null ? errorBuilder!(context, err) : const SizedBox(),
+        child: errorBuilder != null ? errorBuilder!(context, err.value) : const SizedBox(),
       );
     }
 
@@ -86,7 +86,7 @@ class CorePlayer extends StatelessWidget {
               aspectRatio: effectiveAspectRatio,
               child: const HtmlElementView(viewType: 'flutter-cache-video-player-web'),
             ),
-            if (state == PlayState.loading || buffering)
+            if (state.value == PlayState.loading || buffering.value)
               loadingBuilder?.call(context) ?? SizedBox.shrink(),
           ],
         ),
@@ -95,14 +95,14 @@ class CorePlayer extends StatelessWidget {
 
     // Native — loading / buffering
     final textureId = controller.textureId;
-    if (state == PlayState.loading || buffering) {
+    if (state.value == PlayState.loading || buffering.value) {
       return Container(
         color: backgroundColor,
         alignment: Alignment.center,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (buffering && state != PlayState.loading && textureId != null)
+            if (buffering.value && state.value != PlayState.loading && textureId != null)
               AspectRatio(
                 aspectRatio: effectiveAspectRatio,
                 child: Texture(textureId: textureId),

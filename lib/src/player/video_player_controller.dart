@@ -67,9 +67,9 @@ class VideoPlayerController {
 
   /// 视频宽高比（width / height）。未知时返回 `null`。
   /// Video aspect ratio (width / height). Returns `null` until known.
-  late final FlutterComputed<double?> videoAspectRatio = computed(() {
+  late final FlutterComputed<double> videoAspectRatio = computed(() {
     final size = videoSize.value;
-    if (size.width <= 0 || size.height <= 0) return null;
+    if (size.width <= 0 || size.height <= 0) return 16 / 9;
     return size.width / size.height;
   });
 

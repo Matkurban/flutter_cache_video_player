@@ -252,45 +252,47 @@ class _VideoPlayerState extends State<VideoPlayer> {
     final overlay = SafeArea(
       child: AnimatedSwitcher(
         duration: widget.fadeDuration,
-        child: Watch((context) {
-          if (!_visible.value) {
-            return const SizedBox.shrink();
-          }
-          return Column(
-            mainAxisSize: .max,
-            children: <Widget>[
-              widget.topBarBuilder?.call(context, slot) ??
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _handleClose,
-                        color: style.foregroundColor,
-                        icon: Icon(Icons.close),
-                      ),
-                      ...widget.topBarActions,
-                    ],
+        child: SignalBuilder(
+          builder: (context) {
+            if (!_visible.value) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              mainAxisSize: .max,
+              children: <Widget>[
+                widget.topBarBuilder?.call(context, slot) ??
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: _handleClose,
+                          color: style.foregroundColor,
+                          icon: Icon(Icons.close),
+                        ),
+                        ...widget.topBarActions,
+                      ],
+                    ),
+                Expanded(
+                  child: Center(
+                    child:
+                        widget.centerControlsBuilder?.call(context, slot) ??
+                        _DefaultCenterControls(
+                          slot: slot,
+                          skipSecondType: widget.skipSecondType,
+                          onInteract: _showControls,
+                        ),
                   ),
-              Expanded(
-                child: Center(
-                  child:
-                      widget.centerControlsBuilder?.call(context, slot) ??
-                      _DefaultCenterControls(
-                        slot: slot,
-                        skipSecondType: widget.skipSecondType,
-                        onInteract: _showControls,
-                      ),
                 ),
-              ),
-              widget.bottomScrubberBuilder?.call(context, slot) ??
-                  _DefaultBottomScrubber(
-                    slot: slot,
-                    cachedProgress: widget.cachedProgress ?? widget.controller.cachedProgress,
-                    onInteractStart: () => _hideTimer?.cancel(),
-                    onInteractEnd: _scheduleAutoHide,
-                  ),
-            ],
-          );
-        }),
+                widget.bottomScrubberBuilder?.call(context, slot) ??
+                    _DefaultBottomScrubber(
+                      slot: slot,
+                      cachedProgress: widget.cachedProgress ?? widget.controller.cachedProgress,
+                      onInteractStart: () => _hideTimer?.cancel(),
+                      onInteractEnd: _scheduleAutoHide,
+                    ),
+              ],
+            );
+          },
+        ),
       ),
     );
 
@@ -334,10 +336,12 @@ class _VideoPlayerState extends State<VideoPlayer> {
     if (widget.aspectRatio != null) {
       effectiveAspectRatio = widget.aspectRatio!;
     } else {
-      final reported = widget.controller.videoAspectRatio.watch(context);
+      final reported = widget.controller.videoAspectRatio;
       const double minInlineAspect = 16 / 9;
-      if (reported != null && reported > 0) {
-        effectiveAspectRatio = reported >= minInlineAspect ? reported : minInlineAspect;
+      if (reported.value > 0) {
+        effectiveAspectRatio = (reported.value >= minInlineAspect
+            ? reported.value
+            : minInlineAspect);
       } else {
         effectiveAspectRatio = minInlineAspect;
       }
@@ -407,7 +411,7 @@ class _DefaultCenterControls extends StatelessWidget {
     final style = slot.theme;
     final controller = slot.controller;
 
-    return Watch.builder(
+    return SignalBuilder(
       builder: (context) {
         final state = controller.playState.value;
         final buffering = controller.isBuffering.value;
@@ -508,7 +512,7 @@ class _DefaultBottomScrubberState extends State<_DefaultBottomScrubber> {
 
     return Padding(
       padding: style.bottomBarPadding,
-      child: Watch.builder(
+      child: SignalBuilder(
         builder: (context) {
           final position = controller.position.value;
           final duration = controller.duration.value;

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_video_player/flutter_cache_video_player.dart';
-import 'package:signals/signals_flutter.dart';
+import 'package:signals_flutter/signals_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -367,7 +367,7 @@ class _PlayerStateBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Watch.builder(
+      child: SignalBuilder(
         builder: (context) {
           final state = controller.playState.value;
           final buffering = controller.isBuffering.value;
@@ -423,7 +423,7 @@ class _SpeedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Watch.builder(
+      child: SignalBuilder(
         builder: (context) {
           final current = controller.speed.value;
           return Row(

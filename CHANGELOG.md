@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.1
+
+feat(signals): migrate to signals_flutter 7.x and refactor widgets for new API
+
+- Update dependencies to signals_flutter 7.x and signals_lint
+- Refactor CorePlayer and video_player to use SignalWidget and SignalBuilder
+- Replace deprecated Watch/Watch.builder usages with SignalBuilder
+- Update imports and analysis options for new signals_flutter structure
+
 ## [1.9.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.8.0...v1.9.0) (2026-05-05)
 
 

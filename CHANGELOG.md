@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.9.0...v1.10.0) (2026-06-04)
+
+
+### Features
+
+* add FlutterFramework dependency to Package.swift ([8200d91](https://github.com/Matkurban/flutter_cache_video_player/commit/8200d918957e6b608d2187fe4550a1576183bae5))
+* **signals:** migrate to signals_flutter 7.x and refactor widgets for new API ([6527f75](https://github.com/Matkurban/flutter_cache_video_player/commit/6527f757ef0a8f6cac7d9a9876cad9cadc663a6b))
+* **video:** add display rotation handling for Android SurfaceProducer and update video size reporting ([8007c1f](https://github.com/Matkurban/flutter_cache_video_player/commit/8007c1f468c71a175d527103a2763502c68c041c))
+
 ## 1.9.1
 
 feat(signals): migrate to signals_flutter 7.x and refactor widgets for new API

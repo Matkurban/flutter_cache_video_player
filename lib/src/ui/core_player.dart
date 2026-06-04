@@ -95,6 +95,7 @@ class CorePlayer extends SignalWidget {
 
     // Native — loading / buffering
     final textureId = controller.textureId;
+    final rotation = controller.rotationDegrees.value % 360;
     if (state.value == PlayState.loading || buffering.value) {
       return Container(
         color: backgroundColor,
@@ -105,7 +106,7 @@ class CorePlayer extends SignalWidget {
             if (buffering.value && state.value != PlayState.loading && textureId != null)
               AspectRatio(
                 aspectRatio: effectiveAspectRatio,
-                child: Texture(textureId: textureId),
+                child: _VideoTexture(textureId: textureId, rotationDegrees: rotation),
               ),
             loadingBuilder?.call(context) ?? SizedBox.shrink(),
           ],
@@ -128,8 +129,27 @@ class CorePlayer extends SignalWidget {
       alignment: Alignment.center,
       child: AspectRatio(
         aspectRatio: effectiveAspectRatio,
-        child: Texture(textureId: textureId),
+        child: _VideoTexture(textureId: textureId, rotationDegrees: rotation),
       ),
     );
+  }
+}
+
+/// Applies display rotation for Android SurfaceProducer when the engine does
+/// not handle crop/rotation (ImageReader / Impeller path).
+class _VideoTexture extends StatelessWidget {
+  const _VideoTexture({required this.textureId, required this.rotationDegrees});
+
+  final int textureId;
+  final int rotationDegrees;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Texture(textureId: textureId);
+    if (rotationDegrees == 0) {
+      return child;
+    }
+    assert(rotationDegrees % 90 == 0);
+    return RotatedBox(quarterTurns: rotationDegrees ~/ 90, child: child);
   }
 }

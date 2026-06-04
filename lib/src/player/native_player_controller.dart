@@ -33,6 +33,10 @@ class NativePlayerController {
   /// aspect ratio). `Size.zero` until reported by the native player.
   final videoSizeSignal = signal<Size>(Size.zero);
 
+  /// 画面旋转校正（度），仅 Android SurfaceProducer 在不处理旋转时上报非 0。
+  /// Display rotation correction in degrees (0, 90, 180, 270).
+  final rotationDegreesSignal = signal<int>(0);
+
   /// 原生纹理 ID，用于 Flutter Texture widget 渲染。
   /// Native texture ID for Flutter Texture widget rendering.
   int? get textureId => _textureId;
@@ -82,6 +86,8 @@ class NativePlayerController {
         if (value is Map) {
           final w = (value['width'] as num?)?.toDouble() ?? 0;
           final h = (value['height'] as num?)?.toDouble() ?? 0;
+          final rotation = (value['rotationDegrees'] as num?)?.toInt() ?? 0;
+          rotationDegreesSignal.value = rotation % 360;
           if (w > 0 && h > 0) {
             videoSizeSignal.value = Size(w, h);
           } else {
@@ -107,6 +113,7 @@ class NativePlayerController {
     bufferingSignal.value = false;
     errorSignal.value = null;
     videoSizeSignal.value = Size.zero;
+    rotationDegreesSignal.value = 0;
     await _methodChannel.invokeMethod('open', {'url': url});
   }
 

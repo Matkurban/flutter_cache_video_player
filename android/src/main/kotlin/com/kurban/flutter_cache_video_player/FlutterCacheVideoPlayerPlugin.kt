@@ -1,12 +1,11 @@
 package com.kurban.flutter_cache_video_player
 
 import android.graphics.Bitmap
-import android.graphics.SurfaceTexture
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.view.Surface
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -35,14 +34,30 @@ class FlutterCacheVideoPlayerPlugin :
     private lateinit var methodChannel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var textureRegistry: TextureRegistry? = null
-    private var textureEntry: TextureRegistry.SurfaceTextureEntry? = null
+    private var surfaceProducer: TextureRegistry.SurfaceProducer? = null
     private var exoPlayer: ExoPlayer? = null
-    private var surface: Surface? = null
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val workerExecutor = Executors.newSingleThreadExecutor()
     private var currentUrl: String? = null
     private var flutterPluginBinding: FlutterPlugin.FlutterPluginBinding? = null
+    private var needsSurface = true
+    private var surfaceProducerHandlesCropAndRotation = true
+
+    private val surfaceCallback = object : TextureRegistry.SurfaceProducer.Callback {
+        override fun onSurfaceAvailable() {
+            if (!needsSurface) return
+            val player = exoPlayer ?: return
+            val producer = surfaceProducer ?: return
+            player.setVideoSurface(producer.surface)
+            needsSurface = false
+        }
+
+        override fun onSurfaceCleanup() {
+            exoPlayer?.setVideoSurface(null)
+            needsSurface = true
+        }
+    }
 
     private val positionRunnable = object : Runnable {
         override fun run() {
@@ -100,29 +115,39 @@ class FlutterCacheVideoPlayerPlugin :
         }
     }
 
-    /// 创建 ExoPlayer 实例和 SurfaceTexture，返回纹理 ID。
-    /// Creates an ExoPlayer instance and SurfaceTexture, returns texture ID.
+    /// 创建 ExoPlayer 实例和 SurfaceProducer，返回纹理 ID。
+    /// Creates an ExoPlayer instance and SurfaceProducer, returns texture ID.
     private fun handleCreate(result: Result) {
         val binding = flutterPluginBinding ?: run {
             result.error("NO_ENGINE", "Flutter engine not attached", null)
             return
         }
 
-        // Create texture entry
-        textureEntry = textureRegistry?.createSurfaceTexture()
-        val surfaceTexture: SurfaceTexture = textureEntry!!.surfaceTexture()
-        surface = Surface(surfaceTexture)
+        val registry = textureRegistry ?: run {
+            result.error("NO_TEXTURE_REGISTRY", "Texture registry not available", null)
+            return
+        }
 
-        // Create ExoPlayer
+        val producer = registry.createSurfaceProducer()
+        surfaceProducer = producer
+        surfaceProducerHandlesCropAndRotation = producer.handlesCropAndRotation()
+        producer.setCallback(surfaceCallback)
+
         val player = ExoPlayer.Builder(binding.applicationContext).build()
-        player.setVideoSurface(surface)
         player.addListener(playerListener)
         exoPlayer = player
 
-        // Start position reporting
+        val surface = producer.surface
+        if (surface != null) {
+            player.setVideoSurface(surface)
+            needsSurface = false
+        } else {
+            needsSurface = true
+        }
+
         mainHandler.post(positionRunnable)
 
-        result.success(textureEntry!!.id())
+        result.success(producer.id())
     }
 
     /// 打开媒体 URL。
@@ -192,10 +217,11 @@ class FlutterCacheVideoPlayerPlugin :
         exoPlayer?.removeListener(playerListener)
         exoPlayer?.release()
         exoPlayer = null
-        surface?.release()
-        surface = null
-        textureEntry?.release()
-        textureEntry = null
+        surfaceProducer?.setCallback(null)
+        surfaceProducer?.release()
+        surfaceProducer = null
+        needsSurface = true
+        surfaceProducerHandlesCropAndRotation = true
     }
 
     private fun sendEvent(event: String, value: Any?) {
@@ -205,6 +231,19 @@ class FlutterCacheVideoPlayerPlugin :
             data["value"] = value
             eventSink?.success(data)
         }
+    }
+
+    private fun normalizeRotationDegrees(degrees: Int): Int {
+        val normalized = ((degrees % 360) + 360) % 360
+        return when (normalized) {
+            0, 90, 180, 270 -> normalized
+            else -> 0
+        }
+    }
+
+    private fun rotationDegreesFromFormat(player: ExoPlayer): Int {
+        val format: Format = player.videoFormat ?: return 0
+        return normalizeRotationDegrees(format.rotationDegrees)
     }
 
     /// ExoPlayer 事件监听器，将状态变更转发给 Dart EventChannel。
@@ -235,17 +274,23 @@ class FlutterCacheVideoPlayerPlugin :
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
-            // 以显示方向像素数上报，兼容 pixelWidthHeightRatio 非 1 的轨道。
-            // Report display-oriented pixel dimensions so non-1 pixel aspect
-            // ratios (e.g. anamorphic tracks) are handled correctly.
             val rawW = videoSize.width
             val rawH = videoSize.height
             if (rawW <= 0 || rawH <= 0) return
             val par = if (videoSize.pixelWidthHeightRatio > 0f) videoSize.pixelWidthHeightRatio else 1f
             val displayW = (rawW * par).toInt().coerceAtLeast(1)
+
+            var rotationDegrees = 0
+            if (!surfaceProducerHandlesCropAndRotation) {
+                exoPlayer?.let { player ->
+                    rotationDegrees = rotationDegreesFromFormat(player)
+                }
+            }
+
             val size = HashMap<String, Any>()
             size["width"] = displayW
             size["height"] = rawH
+            size["rotationDegrees"] = rotationDegrees
             sendEvent("videoSize", size)
         }
     }

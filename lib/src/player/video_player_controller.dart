@@ -65,11 +65,19 @@ class VideoPlayerController {
   /// the size is not yet known.
   final FlutterSignal<Size> videoSize = signal<Size>(Size.zero);
 
+  /// 画面旋转校正（度），用于 Android Impeller ImageReader 路径。
+  /// Display rotation correction in degrees (0, 90, 180, 270).
+  final FlutterSignal<int> rotationDegrees = signal<int>(0);
+
   /// 视频宽高比（width / height）。未知时返回 `null`。
   /// Video aspect ratio (width / height). Returns `null` until known.
   late final FlutterComputed<double> videoAspectRatio = computed(() {
     final size = videoSize.value;
     if (size.width <= 0 || size.height <= 0) return 16 / 9;
+    final rot = rotationDegrees.value % 360;
+    if (rot == 90 || rot == 270) {
+      return size.height / size.width;
+    }
     return size.width / size.height;
   });
 
@@ -166,6 +174,9 @@ class VideoPlayerController {
         _markReadySinceOpen();
       }
     });
+    VoidCallback rotationEffect = effect(() {
+      rotationDegrees.value = _nativeController.rotationDegreesSignal.value;
+    });
     _disposers.addAll([
       playingEffect,
       positionEffect,
@@ -174,6 +185,7 @@ class VideoPlayerController {
       errorEffect,
       completedEffect,
       videoSizeEffect,
+      rotationEffect,
     ]);
   }
 
@@ -507,6 +519,7 @@ class VideoPlayerController {
       downloadedBytes.value = 0;
       isFullyCached.value = false;
       videoSize.value = Size.zero;
+      rotationDegrees.value = 0;
     });
   }
 }

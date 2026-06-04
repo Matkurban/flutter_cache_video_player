@@ -1,5 +1,9 @@
 group = "com.kurban.flutter_cache_video_player"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
+
+plugins {
+    id("com.android.library")
+}
 
 buildscript {
     val kotlinVersion = "2.2.20"
@@ -21,10 +25,7 @@ allprojects {
     }
 }
 
-plugins {
-    id("com.android.library")
-    id("kotlin-android")
-}
+
 
 android {
     namespace = "com.kurban.flutter_cache_video_player"
@@ -34,12 +35,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
     sourceSets {
@@ -71,6 +66,13 @@ android {
         }
     }
 }
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
 
 dependencies {
     implementation("androidx.media3:media3-exoplayer:1.10.0")

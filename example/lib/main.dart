@@ -73,6 +73,22 @@ const List<_DemoItem> _demoPlaylist = <_DemoItem>[
     'Flutter · Butterfly',
     'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
   ),
+  _DemoItem(
+    'Flutter · Butterfly',
+    'https://media.w3.org/2010/05/bunny/trailer.mp4',
+  ),
+  _DemoItem(
+    'Flutter · Butterfly',
+    'https://media.w3.org/2010/05/sintel/trailer.mp4',
+  ),
+  _DemoItem(
+    'Flutter · Butterfly',
+    'https://media.w3.org/2010/05/video/movie_300.mp4',
+  ),
+  _DemoItem(
+    'Flutter · Butterfly',
+    'https://www.w3schools.com/html/mov_bbb.mp4',
+  ),
 ];
 
 class HomePage extends StatelessWidget {

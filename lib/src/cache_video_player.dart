@@ -71,8 +71,8 @@ class FlutterCacheVideoPlayer {
     _config = config;
   }
 
-  /// 初始化所有服务层：数据库 → 下载线程池 → 代理服务器 → 播放器。
-  /// Initializes all service layers: DB → worker pool → proxy server → player.
+  /// 初始化所有服务层：数据库 → 下载管理器（Worker 懒加载）→ 代理服务器 → 播放器。
+  /// Initializes all service layers: DB → download manager (lazy workers) → proxy server → player.
   ///
   /// Idempotent: repeated calls (including concurrent ones) await the same
   /// in-flight future and never re-run initialization. This prevents

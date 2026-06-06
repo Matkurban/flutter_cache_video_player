@@ -1,3 +1,5 @@
+import 'platform_detector.dart';
+
 /// 缓存配置类，包含所有可调参数。
 /// Cache configuration class containing all tunable parameters.
 class CacheConfig {
@@ -9,12 +11,12 @@ class CacheConfig {
   /// Maximum cache capacity in bytes. Default: 2GB.
   final int maxCacheBytes;
 
-  /// 移动端 Worker Isolate 并发数。
-  /// Number of worker isolates on mobile platforms.
+  /// 移动端 Worker Isolate 并发上限；`0` 表示按平台自动决定。
+  /// Max worker isolates on mobile; `0` selects platform auto concurrency.
   final int mobileWorkerCount;
 
-  /// 桌面端 Worker Isolate 并发数。
-  /// Number of worker isolates on desktop platforms.
+  /// 桌面端 Worker Isolate 并发上限；`0` 表示按平台自动决定。
+  /// Max worker isolates on desktop; `0` selects platform auto concurrency.
   final int desktopWorkerCount;
 
   /// 播放时向前预取的分片数量。
@@ -71,11 +73,15 @@ class CacheConfig {
   /// anyway and lets the player handle the stall.
   final Duration proxyPrefetchTimeout;
 
+  /// 扩容 Worker（id >= 1）全部闲置多久后自动销毁；`Duration.zero` 表示不回收。
+  /// How long expanded workers (id >= 1) may stay idle before shutdown; `Duration.zero` disables reclaim.
+  final Duration workerIdleTimeout;
+
   const CacheConfig({
     this.chunkSize = 2 * 1024 * 1024,
     this.maxCacheBytes = 2 * 1024 * 1024 * 1024,
-    this.mobileWorkerCount = 2,
-    this.desktopWorkerCount = 4,
+    this.mobileWorkerCount = 0,
+    this.desktopWorkerCount = 0,
     this.prefetchCount = 3,
     this.maxRetryCount = 3,
     this.retryBaseDelayMs = 1000,
@@ -88,6 +94,7 @@ class CacheConfig {
     this.highSpeedThreshold = 1280 * 1024,
     this.proxyPrefetchBytes = 256 * 1024,
     this.proxyPrefetchTimeout = const Duration(seconds: 8),
+    this.workerIdleTimeout = const Duration(seconds: 60),
   });
 
   /// 创建当前配置的副本，可选择性覆盖部分参数。
@@ -109,6 +116,7 @@ class CacheConfig {
     int? highSpeedThreshold,
     int? proxyPrefetchBytes,
     Duration? proxyPrefetchTimeout,
+    Duration? workerIdleTimeout,
   }) {
     return CacheConfig(
       chunkSize: chunkSize ?? this.chunkSize,
@@ -127,6 +135,17 @@ class CacheConfig {
       highSpeedThreshold: highSpeedThreshold ?? this.highSpeedThreshold,
       proxyPrefetchBytes: proxyPrefetchBytes ?? this.proxyPrefetchBytes,
       proxyPrefetchTimeout: proxyPrefetchTimeout ?? this.proxyPrefetchTimeout,
+      workerIdleTimeout: workerIdleTimeout ?? this.workerIdleTimeout,
     );
+  }
+
+  /// 解析当前平台的 Worker 池容量（`0` 配置值表示自动）。
+  /// Resolves the worker pool size for the current platform (`0` means auto).
+  int resolveMaxWorkerCount() {
+    if (PlatformDetector.isWeb) return 0;
+
+    final configured = PlatformDetector.isMobile ? mobileWorkerCount : desktopWorkerCount;
+    if (configured <= 0) return PlatformDetector.recommendedWorkerCount;
+    return configured;
   }
 }

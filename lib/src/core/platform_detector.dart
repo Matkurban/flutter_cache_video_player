@@ -1,5 +1,7 @@
 import 'package:universal_platform/universal_platform.dart';
 
+import 'platform_processor.dart';
+
 /// 应用平台类型枚举。
 /// Enumeration of supported application platform types.
 enum AppPlatformType { android, ios, windows, macos, linux, web }
@@ -59,10 +61,31 @@ sealed class PlatformDetector {
     return AppPlatformType.linux;
   }
 
-  /// 获取建议的 Worker 并发数（移动端 2，桌面端 4，Web 0）。
-  /// Returns the recommended worker count (mobile: 2, desktop: 4, web: 0).
+  /// 逻辑 CPU 核心数（Web 或不可用时回退为 4）。
+  /// Number of logical processor cores (falls back to 4 on web / unavailable).
+  static int get processorCores {
+    if (isWeb) return 4;
+    return processorCoreCount;
+  }
+
+  /// 是否为 Linux 服务端环境（与 tostore 一致，用于并发策略）。
+  /// Whether this is a Linux server environment (aligned with tostore).
+  static bool get isServerEnvironment => isLinux;
+
+  /// 获取建议的 Worker 并发数（对齐 tostore recommendedConcurrency）。
+  /// Returns the recommended worker count (aligned with tostore).
   static int get recommendedWorkerCount {
     if (isWeb) return 0;
-    return isMobile ? 2 : 4;
+
+    final cores = processorCores;
+    if (isServerEnvironment) {
+      return cores.clamp(8, 128);
+    } else if (isDesktop) {
+      return cores.clamp(4, 64);
+    } else if (isMobile) {
+      return cores.clamp(4, 16);
+    } else {
+      return cores.clamp(2, 8);
+    }
   }
 }

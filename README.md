@@ -10,8 +10,7 @@ support and minimal bandwidth waste.
 
 - **Stream-while-download** — media plays immediately while chunks download in the background
 - **Chunk-based caching** — media is split into configurable chunks (default 2 MB) and cached individually
-- **Multi-threaded downloads** — Isolate-based worker pool (2 workers on mobile, 4 on desktop) for parallel chunk
-  downloading
+- **Multi-threaded downloads** — Isolate-based worker pool lazily created on first download; expanded workers auto-reclaim after idle; concurrency auto-tuned by platform CPU cores (override with config)
 - **Resumable downloads** — interrupted downloads pick up where they left off via chunk bitmap tracking
 - **LRU cache eviction** — automatic eviction of least-recently-used media when cache limit is reached (default 2 GB)
 - **Smart prefetching** — prefetches upcoming chunks and playlist items ahead of time
@@ -131,8 +130,9 @@ sudo pacman -S mpv
 |--------------------------|---------|-----------------------------------------|
 | `chunkSize`              | 2 MB    | Size of each download chunk             |
 | `maxCacheBytes`          | 2 GB    | Maximum total cache size                |
-| `mobileWorkerCount`      | 2       | Parallel download workers on mobile     |
-| `desktopWorkerCount`     | 4       | Parallel download workers on desktop    |
+| `mobileWorkerCount`      | 0 (auto) | Max parallel download workers on mobile; `0` = platform auto |
+| `desktopWorkerCount`     | 0 (auto) | Max parallel download workers on desktop; `0` = platform auto |
+| `workerIdleTimeout`      | 60s      | Auto-shutdown expanded workers (id >= 1) after idle; `Duration.zero` disables |
 | `prefetchCount`          | 3       | Number of chunks to prefetch ahead      |
 | `maxRetryCount`          | 3       | Max retries for failed chunk downloads  |
 | `retryBaseDelayMs`       | 1000    | Base delay for exponential backoff (ms) |

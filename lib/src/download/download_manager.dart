@@ -36,7 +36,7 @@ class DownloadManager {
 
   final CacheRepository cacheRepo;
 
-  late final DownloadWorkerPool _pool;
+  late final DownloadWorkerPool? _pool;
 
   void Function()? _eventEffectDisposer;
   StreamSubscription<ChunkProgress>? _progressSubscription;
@@ -69,24 +69,24 @@ class DownloadManager {
     return _sessions[urlHash];
   }
 
-  /// 初始化工作线程池并监听 Worker 事件（Web 平台跳过）。
-  /// Initializes the worker pool and subscribes to worker events (skipped on web).
+  /// 初始化下载管理器并注册 Worker 事件（Worker 池在首次下载时懒加载；Web 跳过）。
+  /// Initializes the download manager and worker listeners (pool lazy-loads on first download; skipped on web).
   Future<void> init() async {
-    if (PlatformDetector.isWeb) return;
+    if (PlatformDetector.isWeb) {
+      _pool = null;
+      return;
+    }
 
-    final workerCount = PlatformDetector.isMobile
-        ? config.mobileWorkerCount
-        : config.desktopWorkerCount;
-
-    _pool = DownloadWorkerPool(workerCount: workerCount, config: config);
-    await _pool.start();
+    final pool = DownloadWorkerPool(maxPoolSize: config.resolveMaxWorkerCount(), config: config);
+    _pool = pool;
+    pool.setHasPendingTasksChecker(_hasPendingDownloadTasks);
 
     _eventEffectDisposer = effect(() {
-      final event = _pool.latestEvent.value;
+      final event = pool.latestEvent.value;
       if (event == null) return;
       _onWorkerEvent(event);
     });
-    _progressSubscription = _pool.progressStream.listen(_onChunkProgress);
+    _progressSubscription = pool.progressStream.listen(_onChunkProgress);
   }
 
   void _onChunkProgress(ChunkProgress event) {
@@ -123,6 +123,17 @@ class DownloadManager {
         _dispatchNext();
         break;
     }
+  }
+
+  bool _hasPendingDownloadTasks() {
+    for (final session in _sessions.values) {
+      if (session.taskQueue.isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  void _maybeScheduleWorkerReclamation() {
+    _pool?.scheduleIdleReclamation(hasPendingTasks: _hasPendingDownloadTasks());
   }
 
   Future<void> _onChunkCompleted(ChunkCompleted event) async {
@@ -184,6 +195,7 @@ class DownloadManager {
     if (session == null) return;
     final task = _createTask(session, chunkIndex, TaskPriority.p0Urgent);
     if (task != null) {
+      _pool?.notifyActivity();
       session.taskQueue.add(task);
       if (urlHash == _currentUrlHash) {
         _dispatchNext();
@@ -198,7 +210,7 @@ class DownloadManager {
 
     // 切换媒体时立即取消旧任务，释放 Worker 供新媒体使用。
     // Cancel existing downloads immediately to free workers for the new media.
-    _pool.cancelAll();
+    _pool?.cancelAll();
 
     // 重置信号，避免残留值被新的 effect 监听器误读。
     // Reset signals so stale values from the previous session are not
@@ -223,6 +235,8 @@ class DownloadManager {
 
     if (media.isCompleted) return;
 
+    _pool?.notifyActivity();
+
     // Queue background fill
     final incomplete = session.bitmap.getIncompleteChunks(media.totalChunks);
     for (final idx in incomplete) {
@@ -241,8 +255,10 @@ class DownloadManager {
 
     final targetChunk = byteOffset ~/ config.chunkSize;
 
+    _pool?.notifyActivity();
+
     // Cancel non-critical tasks
-    _pool.cancelAll();
+    _pool?.cancelAll();
 
     // Rebuild queue with new priorities
     session.taskQueue.clear();
@@ -275,11 +291,12 @@ class DownloadManager {
     if (session.bitmap.isChunkCompleted(chunkIndex)) return;
 
     // Check if already being downloaded
-    if (_pool.activeChunkIndices.contains(chunkIndex)) return;
+    if (_pool?.activeChunkIndices.contains(chunkIndex) ?? false) return;
 
     // Add as P0
     final task = _createTask(session, chunkIndex, TaskPriority.p0Urgent);
     if (task != null) {
+      _pool?.notifyActivity();
       session.taskQueue.add(task);
       _dispatchNext();
     }
@@ -314,6 +331,7 @@ class DownloadManager {
     // Skip activeChunkIndices check — this chunk is almost certainly not active.
     final task = _createTask(session, chunkIndex, TaskPriority.p0Urgent);
     if (task != null) {
+      _pool?.notifyActivity();
       session.taskQueue.add(task);
       _dispatchNext();
     }
@@ -337,24 +355,39 @@ class DownloadManager {
   }
 
   void _dispatchNext() {
+    unawaited(_dispatchNextAsync());
+  }
+
+  Future<void> _dispatchNextAsync() async {
+    final pool = _pool;
     final session = _activeSession;
-    if (session == null) return;
+    if (pool == null) return;
 
-    while (_pool.hasAvailableWorker && session.taskQueue.isNotEmpty) {
-      final task = session.taskQueue.first;
-      session.taskQueue.remove(task);
+    if (session != null) {
+      await pool.ensureReady();
 
-      // Skip already completed
-      if (session.bitmap.isChunkCompleted(task.chunkIndex)) {
-        continue;
+      while (pool.hasAvailableWorker && session.taskQueue.isNotEmpty) {
+        final task = session.taskQueue.first;
+
+        // Skip already completed
+        if (session.bitmap.isChunkCompleted(task.chunkIndex)) {
+          session.taskQueue.remove(task);
+          continue;
+        }
+        // Skip already in progress
+        if (pool.activeChunkIndices.contains(task.chunkIndex)) {
+          session.taskQueue.remove(task);
+          continue;
+        }
+
+        if (!await pool.submitTask(task)) {
+          break;
+        }
+        session.taskQueue.remove(task);
       }
-      // Skip already in progress
-      if (_pool.activeChunkIndices.contains(task.chunkIndex)) {
-        continue;
-      }
-
-      _pool.submitTask(task);
     }
+
+    _maybeScheduleWorkerReclamation();
   }
 
   Future<void> _mergeInBackground(_DownloadSession session) async {
@@ -369,11 +402,12 @@ class DownloadManager {
   /// 取消所有下载并清空队列。
   /// Cancels all active downloads and clears the task queue.
   void cancelAll() {
-    _pool.cancelAll();
+    _pool?.cancelAll();
     for (final session in _sessions.values) {
       session.taskQueue.clear();
       session.retryCount.clear();
     }
+    _maybeScheduleWorkerReclamation();
   }
 
   /// 检查指定分片是否已下载完成。
@@ -510,6 +544,6 @@ class DownloadManager {
     activeUrlHash.value = null;
     _currentUrlHash = null;
     _sessions.clear();
-    await _pool.shutdown();
+    await _pool?.shutdown();
   }
 }

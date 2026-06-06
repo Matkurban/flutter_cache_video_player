@@ -9,7 +9,7 @@
 
 - **边下边播** — 媒体立即开始播放，同时后台分块下载
 - **分块缓存** — 媒体被分割为可配置大小的块（默认 2 MB），独立缓存
-- **多线程下载** — 基于 Isolate 的工作线程池（移动端 2 线程，桌面端 4 线程）并行下载
+- **多线程下载** — 基于 Isolate 的工作线程池，首次下载时懒加载；扩容 Worker 闲置后自动回收；并发数按平台 CPU 核心数自动决定（可通过配置覆盖）
 - **断点续传** — 通过 Chunk Bitmap 追踪已下载的块，中断后自动从断点继续
 - **LRU 缓存淘汰** — 缓存达到上限时自动淘汰最久未使用的媒体（默认 2 GB）
 - **智能预取** — 提前预取即将播放的块及播放列表中的下一项
@@ -187,8 +187,9 @@ cmake -DMPV_DOWNLOAD_URL=https://example.com/mpv-dev.7z ^
 |--------------------------|-------|-----------------|
 | `chunkSize`              | 2 MB  | 每个下载分块的大小       |
 | `maxCacheBytes`          | 2 GB  | 最大缓存总容量         |
-| `mobileWorkerCount`      | 2     | 移动端并行下载线程数      |
-| `desktopWorkerCount`     | 4     | 桌面端并行下载线程数      |
+| `mobileWorkerCount`      | 0（自动） | 移动端并行下载 Worker 上限；`0` 表示按平台自动 |
+| `desktopWorkerCount`     | 0（自动） | 桌面端并行下载 Worker 上限；`0` 表示按平台自动 |
+| `workerIdleTimeout`      | 60 秒   | 扩容 Worker（id >= 1）闲置超时后自动销毁；`Duration.zero` 表示禁用 |
 | `prefetchCount`          | 3     | 预取的分块数量         |
 | `maxRetryCount`          | 3     | 下载失败最大重试次数      |
 | `retryBaseDelayMs`       | 1000  | 指数退避基础延迟（毫秒）    |

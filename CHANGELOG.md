@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.10.0...v1.11.0) (2026-06-06)
+
+
+### Features
+
+* **download:** enhance download manager and worker pool with lazy loading and automatic worker reclamation ([a13a5ce](https://github.com/Matkurban/flutter_cache_video_player/commit/a13a5cef7b7289821609d264e92d4388abd7f8d6))
+
 ## [1.10.0](https://github.com/Matkurban/flutter_cache_video_player/compare/v1.9.0...v1.10.0) (2026-06-04)
 
 
